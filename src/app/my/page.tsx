@@ -5,6 +5,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PersonIcon from '@mui/icons-material/Person';
 import styled from '@emotion/styled';
 import { useRouter } from 'next/navigation';
+import EditProfileModal from '@/components/my/EditProfileModal';
 
 // 인터페이스 정의 수정
 interface TravelContent {
@@ -60,6 +61,7 @@ export default function MyPage() {
   const router = useRouter();
   const [travels, setTravels] = useState<TravelContent[]>([]);
   const [userInfo, setUserInfo] = useState<UserInfo>({ nickname: '', region: '' });
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // 사용자 정보 fetch 함수 추가
   const fetchUserInfo = async () => {
@@ -157,6 +159,13 @@ export default function MyPage() {
     return `${startDate} ~ ${endDate}`;
   };
 
+  const handleProfileUpdate = (newNickname: string, newRegion: string) => {
+    setUserInfo({
+      nickname: newNickname,
+      region: newRegion,
+    });
+  };
+
   return (
     <Container>
       <Sidebar>
@@ -176,9 +185,24 @@ export default function MyPage() {
         </Box>
         <Typography fontSize={16} fontWeight="500">{userInfo.nickname || '여행탐험가'}</Typography>
         <Typography fontSize={13} mt={0.5}>나의 지역: {userInfo.region || '정보 없음'}</Typography>
-        <Button variant="outlined" sx={{ mt: 4, borderRadius: '20px' }}>회원정보 수정</Button>
+        <Button 
+          variant="outlined" 
+          sx={{ mt: 4, borderRadius: '20px' }}
+          onClick={() => setIsEditModalOpen(true)}
+        >
+          회원정보 수정
+        </Button>
         <Typography fontSize={12} color="#9A9A9A" mt={2} sx={{ cursor: 'pointer' }}>로그아웃</Typography>
       </Sidebar>
+      
+      <EditProfileModal
+        open={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        currentNickname={userInfo.nickname}
+        currentRegion={userInfo.region}
+        onSave={handleProfileUpdate}
+      />
+
       <MainContent>
         <Typography variant="h6" fontWeight="bold" mb={2}>마이 페이지</Typography>
         <Tabs value={0} sx={{ mb: 2 }}>
