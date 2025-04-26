@@ -23,14 +23,19 @@ async function handleRequest(req: NextRequest) {
         const path = req.url.split('/api/proxy/')[1];
         const targetUrl = `${API_BASE_URL}/api/${path}`;
 
-        const body = req.method === 'GET' ? null : await req.json();
+        let body;
+        try {
+            body = req.method === 'GET' ? null : await req.json();
+        } catch {
+            body = null;  // body가 없는 경우 null로 설정
+        }
         
         const response = await fetch(targetUrl, {
             method: req.method,
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: body ? JSON.stringify(body) : undefined,
+            body: body ? JSON.stringify(body) : undefined,  // body가 null이면 undefined
         });
 
         const data = await response.json();
