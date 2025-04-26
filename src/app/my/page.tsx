@@ -1,48 +1,161 @@
 'use client'
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Typography, Button, Avatar, Tabs, Tab, IconButton, Card, CardContent, CardMedia } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PersonIcon from '@mui/icons-material/Person';
 import styled from '@emotion/styled';
 import { useRouter } from 'next/navigation';
 
-const dummyData = [
-  {
-    id: 1,
-    title: '부산광역시',
-    description: '즐거운 부산여행 ~~',
-    dateRange: '2025-03-25 ~ 2025-03-27',
-    dDay: 'D+2',
-    image: 'https://cdn.pixabay.com/photo/2016/11/18/17/20/beach-1836335_1280.jpg'
-  },
-  {
-    id: 2,
-    title: '부산광역시',
-    description: '여행 일지를 작성해보세요!',
-    dateRange: '2025-03-25 ~ 2025-03-27',
-    dDay: 'D-2',
-    image: null
-  },
-  {
-    id: 3,
-    title: '부산광역시',
-    description: '즐거운 부산여행 ~~',
-    dateRange: '2025-03-25 ~ 2025-03-27',
-    dDay: 'D+2',
-    image: 'https://cdn.pixabay.com/photo/2016/11/18/17/20/beach-1836335_1280.jpg'
-  },
-  {
-    id: 4,
-    title: '부산광역시',
-    description: '여행 일지를 작성해보세요!',
-    dateRange: '2025-03-25 ~ 2025-03-27',
-    dDay: 'D-2',
-    image: null
-  }
-];
+// 인터페이스 정의 수정
+interface TravelContent {
+  travelId: number;
+  title: string;
+  thumbnail: string | null;
+  startDate: string;
+  endDate: string;
+  isPost: boolean;
+}
+
+interface PageableSort {
+  empty: boolean;
+  sorted: boolean;
+  unsorted: boolean;
+}
+
+interface Pageable {
+  offset: number;
+  pageNumber: number;
+  pageSize: number;
+  paged: boolean;
+  unpaged: boolean;
+  sort: PageableSort;
+}
+
+interface TravelData {
+  content: TravelContent[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+  sort: PageableSort;
+  pageable: Pageable;
+  first: boolean;
+  last: boolean;
+  numberOfElements: number;
+  empty: boolean;
+}
+
+interface TravelResponse {
+  message: string;
+  data: TravelData;
+}
+
+// 인터페이스 추가
+interface UserInfo {
+  nickname: string;
+  region: string;
+}
 
 export default function MyPage() {
   const router = useRouter();
+  const [travels, setTravels] = useState<TravelContent[]>([]);
+  const [userInfo, setUserInfo] = useState<UserInfo>({ nickname: '', region: '' });
+
+  // 사용자 정보 fetch 함수 추가
+  const fetchUserInfo = async () => {
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+
+      if (!accessToken) {
+        console.error('No access token found');
+        router.push('/signin');
+        return;
+      }
+
+      const response = await fetch('/api/proxy/v1/member', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('사용자 정보를 불러오는데 실패했습니다.');
+      }
+
+      const responseData = await response.json();
+      
+      if (responseData?.data) {
+        setUserInfo({
+          nickname: responseData.data.nickname,
+          region: responseData.data.region,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+    }
+  };
+
+  // 여행 일정 데이터 fetch
+  const fetchTravels = async () => {
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+
+      if (!accessToken) {
+        console.error('No access token found');
+        router.push('/signin'); // 토큰이 없으면 로그인 페이지로 리다이렉트
+        return;
+      }
+      console.log(accessToken);
+
+      const response = await fetch('/api/proxy/v1/member/travel', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('여행 일정을 불러오는데 실패했습니다.');
+      }
+
+      const responseData: TravelResponse = await response.json();
+
+      if (responseData?.data?.content) {
+        setTravels(responseData.data.content);
+      } else {
+        console.error('Unexpected API response structure:', responseData);
+        setTravels([]);
+      }
+    } catch (error) {
+      console.error('Error fetching travels:', error);
+      setTravels([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserInfo();
+    fetchTravels();
+  }, []);
+
+  // D-day 계산 함수
+  const calculateDday = (startDate: string) => {
+    const today = new Date();
+    const travelDate = new Date(startDate);
+    const diffTime = travelDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 0) return `D-${diffDays}`;
+    if (diffDays < 0) return `D+${Math.abs(diffDays)}`;
+    return 'D-Day';
+  };
+
+  // 날짜 범위 포맷팅 함수
+  const formatDateRange = (startDate: string, endDate: string) => {
+    return `${startDate} ~ ${endDate}`;
+  };
 
   return (
     <Container>
@@ -61,8 +174,8 @@ export default function MyPage() {
         >
           <PersonIcon sx={{ fontSize: 55, color: 'white' }} />
         </Box>
-        <Typography fontSize={16} fontWeight="500">여행탐험가</Typography>
-        <Typography fontSize={13} mt={0.5}>나의 지역: 수원시</Typography>
+        <Typography fontSize={16} fontWeight="500">{userInfo.nickname || '여행탐험가'}</Typography>
+        <Typography fontSize={13} mt={0.5}>나의 지역: {userInfo.region || '정보 없음'}</Typography>
         <Button variant="outlined" sx={{ mt: 4, borderRadius: '20px' }}>회원정보 수정</Button>
         <Typography fontSize={12} color="#9A9A9A" mt={2} sx={{ cursor: 'pointer' }}>로그아웃</Typography>
       </Sidebar>
@@ -73,16 +186,16 @@ export default function MyPage() {
           <Tab label="저장한 여행" />
         </Tabs>
         <CardContainer>
-          {dummyData.map((trip) => (
-            <StyledCard 
-              key={trip.id} 
-              onClick={() => router.push(`/my/${trip.id}`)}
+          {travels.map((trip) => (
+            <StyledCard
+              key={trip.travelId}
+              onClick={() => router.push(`/my/${trip.travelId}`)}
               sx={{ cursor: 'pointer' }}
             >
-              {trip.image && (
+              {trip.isPost && trip.thumbnail && (
                 <CardMedia
                   component="img"
-                  image={trip.image}
+                  image={trip.thumbnail}
                   alt={trip.title}
                   sx={{
                     width: "120px",
@@ -100,22 +213,30 @@ export default function MyPage() {
                 justifyContent: 'flex-end',
                 alignItems: 'flex-start',
                 '&:last-child': {
-                  paddingBottom: 0, // ✅ 이게 핵심!
+                  paddingBottom: 0,
                 },
               }}>
-                <DdayBadge>{trip.dDay}</DdayBadge>
-                <Typography fontSize={18} fontWeight="600" mt={1}>{trip.title}</Typography>
+                <DdayBadge>{calculateDday(trip.startDate)}</DdayBadge>
+                <Typography
+                  fontSize={18}
+                  fontWeight="500"
+                  color="black"
+                >
+                  {trip.title}
+                </Typography>
                 <Typography
                   fontSize={14}
                   sx={{
-                    color: trip.image ? '#585858' : '#9A9A9A', // ✅ 조건에 따라 색상 변경
+                    color: trip.isPost ? '#585858' : '#9A9A9A',
                   }}
                 >
-                  {trip.description}
+                  {trip.isPost ? trip.title : '여행 일지를 작성해보세요!'}
                 </Typography>
-                <Typography fontSize={12} color="#8C8C8C" mt={1}>📅 {trip.dateRange}</Typography>
+                <Typography fontSize={12} color="#8C8C8C" mt={1}>
+                  📅 {formatDateRange(trip.startDate, trip.endDate)}
+                </Typography>
                 <DeleteButton>
-                  <img src="/icons/trash.svg"/>
+                  <img src="/icons/trash.svg" alt="delete" />
                 </DeleteButton>
               </CardContent>
             </StyledCard>

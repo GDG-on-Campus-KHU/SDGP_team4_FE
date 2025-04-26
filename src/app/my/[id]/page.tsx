@@ -1,202 +1,124 @@
 'use client'
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
 import { Box, Typography, Button, IconButton } from '@mui/material';
+import { useParams } from 'next/navigation';
+import CircularProgress from '@mui/material/CircularProgress';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 
-// 더미 데이터
-const dummyTripDetail = {
-    id: 1,
-    title: '부산광역시',
-    dateRange: '2025-03-25 ~ 2025-03-27',
-    days: [
-        {
-            date: '2025-03-25',
-            places: [
-                {
-                    id: 1,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30,
-                    memo: '밥먹고 ~~에서 산책하기'
-                },
-                {
-                    id: 2,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 3,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                }
-            ]
-        },
-        {
-            date: '2025-03-26',
-            places: [
-                {
-                    id: 4,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 5,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 6,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                }
-            ]
-        },
-        {
-            date: '2025-03-27',
-            places: [
-                {
-                    id: 7,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 8,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 9,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                }
-            ]
-        },
-        {
-            date: '2025-03-28',
-            places: [
-                {
-                    id: 7,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 8,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 9,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                }
-            ]
-        },
-        {
-            date: '2025-03-29',
-            places: [
-                {
-                    id: 7,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 8,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 9,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                }
-            ]
-        },
-        {
-            date: '2025-03-30',
-            places: [
-                {
-                    id: 7,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 8,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 9,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                }
-            ]
-        },
-        {
-            date: '2025-03-31',
-            places: [
-                {
-                    id: 7,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 8,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                },
-                {
-                    id: 9,
-                    name: '식당식당식당',
-                    address: '부산광역시 명동로 27-2',
-                    travelDuration: 30
-                }
-            ]
-        }
-    ]
+// 인터페이스 정의
+interface TravelInfoDto {
+  travelId: number;
+  title: string;
+  thumbnail: string | null;
+  startDate: string;
+  endDate: string;
+  isPost: boolean;
+}
+
+interface CourseInfoDto {
+  id: number;
+  nextId: number | null;
+  courseDate: string;
+  moveTime: number;
+  name: string;
+  address: string;
+  description: string;
+}
+
+interface ApiResponse {
+  message: string;
+  data: {
+    travelInfoDto: TravelInfoDto;
+    courseInfoDtoList: CourseInfoDto[];
+  };
+}
+
+// 날짜별로 코스를 그룹화하는 함수
+const groupCoursesByDate = (courses: CourseInfoDto[]) => {
+  const grouped = courses.reduce((acc, course) => {
+    const date = course.courseDate;
+    if (!acc[date]) {
+      acc[date] = [];
+    }
+    acc[date].push(course);
+    return acc;
+  }, {} as Record<string, CourseInfoDto[]>);
+
+  return Object.entries(grouped).map(([date, places]) => ({
+    date,
+    places
+  }));
 };
 
-// Place 타입 정의 추가
-type Place = {
-    id: number;
-    name: string;
-    address: string;
-    travelDuration: number;
-    memo?: string;
-};
+// Loading 컴포넌트 스타일 추가
+const LoadingContainer = styled(Box)`
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 70px); // 헤더 높이(70px)를 제외한 전체 높이
+`;
 
-export default function TripDetailPage({ params }: { params: { id: string } }) {
+export default function TripDetailPage() {
+    const params = useParams();
     const [currentPage, setCurrentPage] = useState(0);
-    // 메모 편집 상태를 관리하는 state 추가
     const [editingMemo, setEditingMemo] = useState<number | null>(null);
     const [memoText, setMemoText] = useState<string>('');
-    
-    // 더미데이터를 state로 변경하여 수정 가능하게 만듦
-    const [tripData, setTripData] = useState(dummyTripDetail);
+    const [tripData, setTripData] = useState<{
+        title: string;
+        dateRange: string;
+        days: { date: string; places: CourseInfoDto[] }[];
+    } | null>(null);
 
-    // 3일씩 나누어 표시하고 각 날짜에 고유한 키 부여
+    useEffect(() => {
+        const fetchTripData = async () => {
+            try {
+                const accessToken = localStorage.getItem('accessToken');
+                if (!accessToken) {
+                    console.error('No access token found');
+                    return;
+                }
+
+                const response = await fetch(`/api/proxy/v1/member/travel/${params.id}`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch trip data');
+                }
+
+                const data: ApiResponse = await response.json();
+                const { travelInfoDto, courseInfoDtoList } = data.data;
+
+                // 데이터 구조 변환
+                const formattedData = {
+                    title: travelInfoDto.title,
+                    dateRange: `${travelInfoDto.startDate} ~ ${travelInfoDto.endDate}`,
+                    days: groupCoursesByDate(courseInfoDtoList)
+                };
+
+                setTripData(formattedData);
+            } catch (error) {
+                console.error('Error fetching trip data:', error);
+            }
+        };
+
+        fetchTripData();
+    }, [params.id]);
+
+    if (!tripData) {
+        return (
+            <LoadingContainer>
+                <CircularProgress />
+            </LoadingContainer>
+        );
+    }
+
     const totalDays = tripData.days.map((day, index) => ({
         ...day,
-        uniqueKey: `day-${index}` // 고유한 키 추가
+        uniqueKey: `day-${index}`
     }));
 
     const pagesCount = Math.ceil(totalDays.length / 3);
@@ -223,7 +145,7 @@ export default function TripDetailPage({ params }: { params: { id: string } }) {
     // 메모 저장 핸들러
     const handleSaveMemo = (dayIndex: number, placeIndex: number) => {
         const newTripData = { ...tripData };
-        newTripData.days[dayIndex].places[placeIndex].memo = memoText;
+        newTripData.days[dayIndex].places[placeIndex].description = memoText;
         setTripData(newTripData);
         setEditingMemo(null);
         setMemoText('');
@@ -252,7 +174,6 @@ export default function TripDetailPage({ params }: { params: { id: string } }) {
                         <StyledButton variant="contained">여행일지 쓰기</StyledButton>
                     </ButtonContainer>
                 </Header>
-
             </HeaderContainer>
             <TimelineSection>
                 <DaysContainer>
@@ -268,13 +189,13 @@ export default function TripDetailPage({ params }: { params: { id: string } }) {
                                                 <PlaceAddress>{place.address}</PlaceAddress>
                                             </PlaceInfo>
                                             <ArrowIcon />
-                                            {!place.memo && !editingMemo && 
+                                            {!place.description && !editingMemo && 
                                                 <AddMemoButton onClick={() => handleAddMemo(place.id)}>
                                                     + 메모추가
                                                 </AddMemoButton>
                                             }
                                         </PlaceContent>
-                                        {(place.memo || editingMemo === place.id) && (
+                                        {(place.description || editingMemo === place.id) && (
                                             <MemoBox>
                                                 {editingMemo === place.id ? (
                                                     <>
@@ -297,8 +218,8 @@ export default function TripDetailPage({ params }: { params: { id: string } }) {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        {place.memo}
-                                                        <EditButton onClick={() => handleEditMemo(place.id, place.memo || '')}>
+                                                        {place.description}
+                                                        <EditButton onClick={() => handleEditMemo(place.id, place.description)}>
                                                             수정하기
                                                         </EditButton>
                                                     </>
@@ -308,7 +229,7 @@ export default function TripDetailPage({ params }: { params: { id: string } }) {
                                         {placeIndex < day.places.length - 1 && (
                                             <TimelineWrapper>
                                                 <TimelineLine />
-                                                <TimelineDuration>{place.travelDuration}분</TimelineDuration>
+                                                <TimelineDuration>{place.moveTime}분</TimelineDuration>
                                             </TimelineWrapper>
                                         )}
                                     </PlaceItem>
@@ -577,8 +498,7 @@ const RightArrow = styled(Box)`
     margin-left: 3px;
 `;
 
-const LeftArrow = styled(Box)`
-    width: 0;
+const LeftArrow = styled(Box)`    width: 0;
     height: 0;
     border-top: 7px solid transparent;
     border-bottom: 7px solid transparent;

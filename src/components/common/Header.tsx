@@ -29,14 +29,12 @@ const HeaderWrapper = styled.header`
   justify-content: space-between;
 `;
 
-const LogoSection = styled(Link)`
+const LogoSection = styled.div`
   display: flex;
   align-items: center;
   font-weight: bold;
   font-size: 20px;
   color: #90a4c8;
-  text-decoration: none;
-  cursor: pointer;
 `;
 
 const NavMenu = styled.nav`
@@ -45,11 +43,17 @@ const NavMenu = styled.nav`
   gap: 50px;
 `;
 
-const NavLink = styled(Link)<{ isActive: boolean }>`
+interface StyledLinkProps {
+  active: boolean;
+}
+
+const NavLink = styled(Link, {
+  shouldForwardProp: (prop) => prop !== 'active'
+})<StyledLinkProps>`
   font-size: 14px;
-  color: ${props => props.isActive ? '#90a4c8' : '#9A9A9A'};
+  color: ${props => props.active ? '#90a4c8' : '#9A9A9A'};
   text-decoration: none;
-  font-weight: ${props => props.isActive ? 'bold' : 'normal'};
+  font-weight: ${props => props.active ? 'bold' : 'normal'};
   &:hover {
     color: #90a4c8;
   }
@@ -82,15 +86,15 @@ export default function Header() {
 
   return (
     <HeaderWrapper>
-      <LogoSection href="/">
+      <LogoSection>
         <WhereToVoteIcon fontSize='large'/>
         MAPORY
       </LogoSection>
 
       <NavMenu>
-        <NavLink href="/map" isActive={pathname === '/map'}>지도</NavLink>
-        <NavLink href="/diary" isActive={pathname === '/diary'}>여행일지</NavLink>
-        <NavLink href="/my" isActive={pathname === '/my'}>MY</NavLink>
+        <NavLink href="/map" active={pathname === '/map'}>지도</NavLink>
+        <NavLink href="/diary" active={pathname === '/diary'}>여행일지</NavLink>
+        <NavLink href="/my" active={pathname === '/my'}>MY</NavLink>
         <Button
           onClick={handleAuthClick}
           variant={isLoggedIn ? "outlined" : "contained"}

@@ -24,6 +24,18 @@ interface RightPanelProps {
     onResetPlaces?: (dateStr: string) => void;
 }
 
+interface CreateTravelResponse {
+  data: number; // travelId
+}
+
+interface TravelCourse {
+  name: string;
+  address: string;
+  description: string;
+  courseDate: string;
+  moveTime: number;
+}
+
 const RightPanel = ({
     isOpen,
     plan,
@@ -77,6 +89,67 @@ const RightPanel = ({
         const hours = Math.floor(minutes / 60);
         const remainingMinutes = minutes % 60;
         return remainingMinutes > 0 ? `${hours}시간 ${remainingMinutes}분` : `${hours}시간`;
+    };
+
+    const handleCreateTravel = async () => {
+        const accessToken = localStorage.getItem('accessToken');
+        try {
+            // 1. 여행 일정 생성 요청
+            const createTravelResponse = await fetch('/api/proxy/v1/travel', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({
+                    title: plan.region,
+                    thumbnail: null,
+                    startDate: plan.startDate.toISOString().split('T')[0],
+                    endDate: plan.endDate.toISOString().split('T')[0],
+                }),
+            });
+
+            if (!createTravelResponse.ok) {
+                throw new Error('여행 일정 생성에 실패했습니다.');
+            }
+
+            const { data: travelId }: CreateTravelResponse = await createTravelResponse.json();
+
+            // 2. 날짜별로 정렬된 코스 데이터 생성
+            const courses: TravelCourse[] = dayPlans
+                .filter(dayPlan => dayPlan.places.length > 0) // 장소가 있는 날짜만 필터링
+                .flatMap(dayPlan => 
+                    dayPlan.places.map(place => ({
+                        name: place.name,
+                        address: place.address,
+                        description: '',
+                        courseDate: dayPlan.date.toISOString().split('T')[0],
+                        moveTime: place.travelDuration || 0,
+                    }))
+                );
+
+            // 3. 여행 코스 등록 요청
+            const createCoursesResponse = await fetch(`/api/proxy/v1/travel/${travelId}/course`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify(courses),
+            });
+
+            if (!createCoursesResponse.ok) {
+                throw new Error('여행 코스 등록에 실패했습니다.');
+            }
+
+            // 성공 시 처리 (예: 알림 표시, 페이지 이동 등)
+            alert('여행 일정이 성공적으로 등록되었습니다.');
+            window.location.href = '/my';
+
+        } catch (error) {
+            console.error('Error:', error);
+            alert('여행 일정 등록에 실패했습니다.');
+        }
     };
 
     return (
@@ -181,7 +254,12 @@ const RightPanel = ({
                     )}
 
                     <BottomSection>
-                        <Button color="primary" variant="contained" fullWidth>
+                        <Button 
+                            color="primary" 
+                            variant="contained" 
+                            fullWidth
+                            onClick={handleCreateTravel}
+                        >
                             + 여행 일정 등록하기
                         </Button>
                     </BottomSection>
