@@ -4,6 +4,7 @@ import styled from '@emotion/styled';
 import { Box, Typography, Button, IconButton } from '@mui/material';
 import { useParams } from 'next/navigation';
 import CircularProgress from '@mui/material/CircularProgress';
+import api from '@/utils/axios';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 
 // 인터페이스 정의
@@ -73,30 +74,13 @@ export default function TripDetailPage() {
     useEffect(() => {
         const fetchTripData = async () => {
             try {
-                const accessToken = localStorage.getItem('accessToken');
-                if (!accessToken) {
-                    console.error('No access token found');
-                    return;
-                }
-
-                const response = await fetch(`/api/proxy/v1/member/travel/${params.id}`, {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                    },
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch trip data');
-                }
-
-                const data: ApiResponse = await response.json();
-                const { travelInfoDto, courseInfoDtoList } = data.data;
-
+                const { data } = await api.get<ApiResponse>(`/v1/member/travel/${params.id}`);
+                
                 // 데이터 구조 변환
                 const formattedData = {
-                    title: travelInfoDto.title,
-                    dateRange: `${travelInfoDto.startDate} ~ ${travelInfoDto.endDate}`,
-                    days: groupCoursesByDate(courseInfoDtoList)
+                    title: data.data.travelInfoDto.title,
+                    dateRange: `${data.data.travelInfoDto.startDate} ~ ${data.data.travelInfoDto.endDate}`,
+                    days: groupCoursesByDate(data.data.courseInfoDtoList)
                 };
 
                 setTripData(formattedData);

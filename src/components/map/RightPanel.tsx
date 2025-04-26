@@ -7,6 +7,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { TransportMode, DayPlan, Plan } from '@/type/plan';
 import { useEffect, useState } from 'react';
+import api from '@/utils/axios';
 
 interface RightPanelProps {
     isOpen: boolean;
@@ -92,28 +93,16 @@ const RightPanel = ({
     };
 
     const handleCreateTravel = async () => {
-        const accessToken = localStorage.getItem('accessToken');
         try {
             // 1. 여행 일정 생성 요청
-            const createTravelResponse = await fetch('/api/proxy/v1/travel', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
-                },
-                body: JSON.stringify({
-                    title: plan.region,
-                    thumbnail: null,
-                    startDate: plan.startDate.toISOString().split('T')[0],
-                    endDate: plan.endDate.toISOString().split('T')[0],
-                }),
+            const { data: createTravelResponse } = await api.post<CreateTravelResponse>('/v1/travel', {
+                title: plan.region,
+                thumbnail: null,
+                startDate: plan.startDate.toISOString().split('T')[0],
+                endDate: plan.endDate.toISOString().split('T')[0],
             });
 
-            if (!createTravelResponse.ok) {
-                throw new Error('여행 일정 생성에 실패했습니다.');
-            }
-
-            const { data: travelId }: CreateTravelResponse = await createTravelResponse.json();
+            const travelId = createTravelResponse.data;
 
             // 2. 날짜별로 정렬된 코스 데이터 생성
             const courses: TravelCourse[] = dayPlans
@@ -129,20 +118,9 @@ const RightPanel = ({
                 );
 
             // 3. 여행 코스 등록 요청
-            const createCoursesResponse = await fetch(`/api/proxy/v1/travel/${travelId}/course`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
-                },
-                body: JSON.stringify(courses),
-            });
+            await api.post(`/v1/travel/${travelId}/course`, courses);
 
-            if (!createCoursesResponse.ok) {
-                throw new Error('여행 코스 등록에 실패했습니다.');
-            }
-
-            // 성공 시 처리 (예: 알림 표시, 페이지 이동 등)
+            // 성공 시 처리
             alert('여행 일정이 성공적으로 등록되었습니다.');
             window.location.href = '/my';
 

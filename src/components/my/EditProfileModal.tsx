@@ -12,6 +12,7 @@ import {
     InputAdornment,
 } from '@mui/material';
 import styled from '@emotion/styled';
+import api from '@/utils/axios';
 
 interface EditProfileModalProps {
     open: boolean;
@@ -71,6 +72,20 @@ const koreanCities = [
     // 제주특별자치도
     '제주특별자치도 제주시', '제주특별자치도 서귀포시'
 ];
+
+// 응답 타입 정의 추가
+interface NicknameCheckResponse {
+    code: number;
+    message: string;
+}
+
+interface ProfileUpdateResponse {
+    message: string;
+    data: {
+        nickname: string;
+        region: string;
+    };
+}
 
 export default function EditProfileModal({
     open,
@@ -149,14 +164,9 @@ export default function EditProfileModal({
 
         setIsCheckingNickname(true);
         try {
-            const response = await fetch(`/api/proxy/v1/auth/nickname?nickname=${encodeURIComponent(formData.username)}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-
-            const responseData = await response.json();
+            const { data: responseData } = await api.post<NicknameCheckResponse>(
+                `/v1/auth/nickname?nickname=${encodeURIComponent(formData.username)}`
+            );
             
             if (responseData.code === 8002) {
                 setNicknameMessage('이미 사용 중인 닉네임입니다.');
@@ -188,22 +198,10 @@ export default function EditProfileModal({
         }
 
         try {
-            const accessToken = localStorage.getItem('accessToken');
-            const response = await fetch('/api/proxy/v1/member', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
-                },
-                body: JSON.stringify({
-                    nickname: formData.username,
-                    region: formData.region,
-                }),
+            await api.put<ProfileUpdateResponse>('/v1/member', {
+                nickname: formData.username,
+                region: formData.region,
             });
-
-            if (!response.ok) {
-                throw new Error('회원정보 수정에 실패했습니다.');
-            }
 
             onSave(formData.username, formData.region);
             onClose();

@@ -6,6 +6,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import styled from '@emotion/styled';
 import { useRouter } from 'next/navigation';
 import EditProfileModal from '@/components/my/EditProfileModal';
+import api from '@/utils/axios';
 
 // 인터페이스 정의 수정
 interface TravelContent {
@@ -57,6 +58,15 @@ interface UserInfo {
   region: string;
 }
 
+// 응답 타입 정의
+interface MemberResponse {
+  message: string;
+  data: {
+    nickname: string;
+    region: string;
+  };
+}
+
 export default function MyPage() {
   const router = useRouter();
   const [travels, setTravels] = useState<TravelContent[]>([]);
@@ -66,32 +76,12 @@ export default function MyPage() {
   // 사용자 정보 fetch 함수 추가
   const fetchUserInfo = async () => {
     try {
-      const accessToken = localStorage.getItem('accessToken');
-
-      if (!accessToken) {
-        console.error('No access token found');
-        router.push('/signin');
-        return;
-      }
-
-      const response = await fetch('/api/proxy/v1/member', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('사용자 정보를 불러오는데 실패했습니다.');
-      }
-
-      const responseData = await response.json();
+      const { data } = await api.get<MemberResponse>('/v1/member');
       
-      if (responseData?.data) {
+      if (data?.data) {
         setUserInfo({
-          nickname: responseData.data.nickname,
-          region: responseData.data.region,
+          nickname: data.data.nickname,
+          region: data.data.region,
         });
       }
     } catch (error) {
@@ -102,33 +92,12 @@ export default function MyPage() {
   // 여행 일정 데이터 fetch
   const fetchTravels = async () => {
     try {
-      const accessToken = localStorage.getItem('accessToken');
+      const { data } = await api.get<TravelResponse>('/v1/member/travel');
 
-      if (!accessToken) {
-        console.error('No access token found');
-        router.push('/signin'); // 토큰이 없으면 로그인 페이지로 리다이렉트
-        return;
-      }
-      console.log(accessToken);
-
-      const response = await fetch('/api/proxy/v1/member/travel', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('여행 일정을 불러오는데 실패했습니다.');
-      }
-
-      const responseData: TravelResponse = await response.json();
-
-      if (responseData?.data?.content) {
-        setTravels(responseData.data.content);
+      if (data?.data?.content) {
+        setTravels(data.data.content);
       } else {
-        console.error('Unexpected API response structure:', responseData);
+        console.error('Unexpected API response structure:', data);
         setTravels([]);
       }
     } catch (error) {
