@@ -86,11 +86,12 @@ export default function Header() {
 
   return (
     <HeaderWrapper>
-      <LogoSection>
-        <WhereToVoteIcon fontSize='large'/>
-        MAPORY
-      </LogoSection>
-
+      <NavLink href="/" active={pathname === '/'}>
+        <LogoSection>
+          <WhereToVoteIcon fontSize='large'/>
+          MAPORY
+        </LogoSection>
+      </NavLink>
       <NavMenu>
         <NavLink href="/map" active={pathname === '/map'}>지도</NavLink>
         <NavLink href="/diary" active={pathname === '/diary'}>여행일지</NavLink>
