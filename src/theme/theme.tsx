@@ -20,7 +20,7 @@ const theme = createTheme({
       contrastText: '#000000',
     },
     info: {
-      main: '#2196f3', // 밝은 파랑
+      main: '#C1C1C1', // 밝은 파랑
       contrastText: '#ffffff',
     },
     success: {

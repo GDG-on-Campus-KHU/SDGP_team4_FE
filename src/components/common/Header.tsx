@@ -94,7 +94,7 @@ export default function Header() {
       </NavLink>
       <NavMenu>
         <NavLink href="/map" active={pathname === '/map'}>지도</NavLink>
-        <NavLink href="/diary" active={pathname === '/diary'}>여행일지</NavLink>
+        <NavLink href="/travel" active={pathname === '/travel'}>여행일지</NavLink>
         <NavLink href="/my" active={pathname === '/my'}>MY</NavLink>
         <Button
           onClick={handleAuthClick}
