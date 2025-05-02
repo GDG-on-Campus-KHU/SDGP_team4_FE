@@ -1,5 +1,5 @@
 'use client';
-import { LoadScript, GoogleMap, Marker, Polyline, OverlayView } from '@react-google-maps/api';
+import { GoogleMap, Marker, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
 import React, { useState, useCallback, useRef } from 'react';
 import { Box, Button } from '@mui/material';
 import styled from '@emotion/styled';
@@ -55,6 +55,12 @@ export default function MapPage() {
 
   // 새로운 마커 애니메이션을 위한 state 추가
   const [newPlaceId, setNewPlaceId] = useState<string | null>(null);
+
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: 'AIzaSyDx01yI23584jz6SnjWsltrVrl0vkQve6U',
+    libraries: ['places', 'geometry'],
+    language: 'ko',
+  });
 
   const onLoad = useCallback((ref: google.maps.places.Autocomplete) => {
     ref.setFields(['name', 'formatted_address', 'geometry', 'photos']);
@@ -400,77 +406,74 @@ export default function MapPage() {
     setTransportMode(mode);
   }, [dayPlans, calculateTravelTime]);
 
+  if (!isLoaded) return <div>지도를 불러오는 중...</div>;
+
   return (
     <Container>
-      <LoadScript
-        googleMapsApiKey="AIzaSyDx01yI23584jz6SnjWsltrVrl0vkQve6U"
-        libraries={['places', 'geometry']}
-      >
-        <MapWrapper>
-          <GoogleMap
-            mapContainerStyle={containerStyle}
-            center={center}
-            zoom={13}
-            onLoad={onMapLoad}
-          >
-            {/* 선택된 날짜의 장소들 표시 */}
-            {getCurrentDayMarkers().map((place, index) => (
-              <React.Fragment key={place.id}>
-                <OverlayView
-                  position={{
-                    lat: place.location.lat,
-                    lng: place.location.lng
-                  }}
-                  mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                  getPixelPositionOffset={(width, height) => ({
-                    x: -(width / 2),
-                    y: -height
-                  })}
-                >
-                  <MarkerContainer isNew={place.id === newPlaceId}>
-                    <NumberMarker>
-                      {index + 1}
-                    </NumberMarker>
-                    <CommentBubble>
-                      <ChatIcon fontSize='small'/>
-                      0
-                    </CommentBubble>
-                  </MarkerContainer>
-                </OverlayView>
-              </React.Fragment>
-            ))}
+      <MapWrapper>
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          center={center}
+          zoom={13}
+          onLoad={onMapLoad}
+        >
+          {/* 선택된 날짜의 장소들 표시 */}
+          {getCurrentDayMarkers().map((place, index) => (
+            <React.Fragment key={place.id}>
+              <OverlayView
+                position={{
+                  lat: place.location.lat,
+                  lng: place.location.lng
+                }}
+                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                getPixelPositionOffset={(width, height) => ({
+                  x: -(width / 2),
+                  y: -height
+                })}
+              >
+                <MarkerContainer isNew={place.id === newPlaceId}>
+                  <NumberMarker>
+                    {index + 1}
+                  </NumberMarker>
+                  <CommentBubble>
+                    <ChatIcon fontSize='small'/>
+                    0
+                  </CommentBubble>
+                </MarkerContainer>
+              </OverlayView>
+            </React.Fragment>
+          ))}
 
-            {/* 순서 동그라미를 잇는 선 */}
-            <Polyline
-              path={getPathCoordinates()}
-              options={{
-                ...polylineOptions,
-                strokeColor: '#4B89DC',
-                strokeOpacity: 1,
-                strokeWeight: 3,
-                icons: []
-              }}
+          {/* 순서 동그라미를 잇는 선 */}
+          <Polyline
+            path={getPathCoordinates()}
+            options={{
+              ...polylineOptions,
+              strokeColor: '#4B89DC',
+              strokeOpacity: 1,
+              strokeWeight: 3,
+              icons: []
+            }}
+          />
+
+          {/* 검색된 장소 마커 */}
+          {markerPosition && !selectedPlace && (
+            <Marker
+              position={markerPosition}
+              animation={google.maps.Animation.DROP}
             />
-
-            {/* 검색된 장소 마커 */}
-            {markerPosition && !selectedPlace && (
-              <Marker
-                position={markerPosition}
-                animation={google.maps.Animation.DROP}
-              />
-            )}
-          </GoogleMap>
-        </MapWrapper>
-        <Sidebar
-          open={sidebarOpen}
-          onLoad={onLoad}
-          onPlaceChanged={onPlaceChanged}
-          placeName={placeName}
-          setPlaceName={setPlaceName}
-          selectedPlace={selectedPlace}
-          onAddPlace={() => selectedPlace && handleAddPlace(selectedPlace)}
-        />
-      </LoadScript>
+          )}
+        </GoogleMap>
+      </MapWrapper>
+      <Sidebar
+        open={sidebarOpen}
+        onLoad={onLoad}
+        onPlaceChanged={onPlaceChanged}
+        placeName={placeName}
+        setPlaceName={setPlaceName}
+        selectedPlace={selectedPlace}
+        onAddPlace={() => selectedPlace && handleAddPlace(selectedPlace)}
+      />
       <ToggleButton sidebarOpen={sidebarOpen} onClick={() => setSidebarOpen(!sidebarOpen)}>
         {sidebarOpen ? (
           <ChevronLeftIcon sx={{ color: '#9A9A9A' }} />

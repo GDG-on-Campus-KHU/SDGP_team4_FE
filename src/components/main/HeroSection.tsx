@@ -237,6 +237,9 @@ const ButtonContainer = styled(motion.div)`
 const IllustrationWrapper = styled(motion.div)`
   flex: 1;
   position: relative;
+  min-width: 0;
+  min-height: 200px;
+  width: 100%;
 `;
 
 const IllustrationContainer = styled.div`
@@ -244,11 +247,14 @@ const IllustrationContainer = styled.div`
   width: 100%;
   max-width: 32rem;
   margin: 0 auto;
+  min-width: 0;
 `;
 
 const FloatingCard = styled(motion.div)`
   width: 100%;
+  min-width: 0;
   height: 24rem;
+  min-height: 200px;
   background-color: white;
   border-radius: 1.5rem;
   box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);

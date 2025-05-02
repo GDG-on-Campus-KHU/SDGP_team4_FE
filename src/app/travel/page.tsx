@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { Box, Typography, Card, CardContent, CardMedia, Avatar, Pagination } from '@mui/material';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import SearchIcon from '@mui/icons-material/Search';
 import { useRouter } from 'next/navigation';
 import styled from '@emotion/styled';
 
@@ -26,11 +28,21 @@ const dummyData: TravelCardData[] = Array.from({ length: 24 }, (_, i) => ({
 }));
 
 const TravelPage = () => {
-    const itemsPerPage = 8;
+    const itemsPerPage = 9;
     const [page, setPage] = useState(1);
     const router = useRouter();
+    const [bookmarked, setBookmarked] = useState<boolean[]>(Array(dummyData.length).fill(false));
+
     const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
         setPage(value);
+    };
+
+    const handleBookmarkClick = (idx: number) => {
+        setBookmarked(prev => {
+            const updated = [...prev];
+            updated[idx] = !updated[idx];
+            return updated;
+        });
     };
 
     const paginatedData = dummyData.slice((page - 1) * itemsPerPage, page * itemsPerPage);
@@ -40,6 +52,9 @@ const TravelPage = () => {
             <ContentWrapper>
                 <SearchSection>
                     <SearchInput placeholder="지역을 검색해보세요!" />
+                    <SearchIconWrapper>
+                        <SearchIcon sx={{fontSize: '28px'}}/>
+                    </SearchIconWrapper>
                 </SearchSection>
                 <div style={{ marginTop: '50px' }}>
                     <SortTabs>
@@ -48,63 +63,72 @@ const TravelPage = () => {
                         <Typography variant="body2">인기순</Typography>
                     </SortTabs>
                     <CardContainer>
-                        {paginatedData.map((card) => (
-                            <StyledCard key={card.id} onClick={() => router.push(`/travel/${card.id}`)}>
-                                <CardMedia
-                                    component="img"
-                                    image={card.thumbnail}
-                                    alt={card.title}
-                                    sx={{
-                                        width: "120px",
-                                        borderRadius: "5px",
-                                        backgroundColor: '#f5f5f5',
-                                        objectFit: 'cover',
-                                        marginRight: "16px"
-                                    }}
-                                />
-                                <CardContent
-                                    sx={{
-                                        padding: 0,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'flex-end',
-                                        alignItems: 'flex-start',
-                                        '&:last-child': {
-                                            paddingBottom: 0,
-                                        },
-                                    }}
-                                >
-                                    <AuthorInfo>
-                                        <Avatar src={card.avatar} sx={{ width: 24, height: 24 }} />
-                                        <Typography fontSize={12} ml={0.5}>{card.author}</Typography>
-                                    </AuthorInfo>
-                                    <Typography fontSize={18} fontWeight="500" color="black" mt={1.5}>{card.region}</Typography>
-                                    <Typography fontSize={14} color='#585858'>{card.title}</Typography>
-                                    <Typography fontSize={12} color="#8C8C8C" mt={0.5} >
-                                        📅 {card.dateRange}
-                                    </Typography>
-                                </CardContent>
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '1rem',
-                                    right: '1rem',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                }}>
-                                    <div style={{
-                                        fontSize: '12px',
-                                        color: '#333'
-                                    }}>12</div>
-                                    <BookmarkBorderIcon
+                        {paginatedData.map((card, idx) => {
+                            const globalIdx = (page - 1) * itemsPerPage + idx;
+                            return (
+                                <StyledCard key={card.id} onClick={() => router.push(`/travel/${card.id}`)}>
+                                    <CardMedia
+                                        component="img"
+                                        image={card.thumbnail}
+                                        alt={card.title}
                                         sx={{
-                                            color: '#333',
+                                            width: "120px",
+                                            borderRadius: "5px",
+                                            backgroundColor: '#f5f5f5',
+                                            objectFit: 'cover',
+                                            marginRight: "16px"
                                         }}
                                     />
-                                </div>
-                            </StyledCard>
-                        ))}
+                                    <CardContent
+                                        sx={{
+                                            padding: 0,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            justifyContent: 'flex-end',
+                                            alignItems: 'flex-start',
+                                            '&:last-child': {
+                                                paddingBottom: 0,
+                                            },
+                                        }}
+                                    >
+                                        <AuthorInfo>
+                                            <Avatar src={card.avatar} sx={{ width: 24, height: 24 }} />
+                                            <Typography fontSize={12} ml={0.5}>{card.author}</Typography>
+                                        </AuthorInfo>
+                                        <Typography fontSize={18} fontWeight="500" color="black" mt={1.5}>{card.region}</Typography>
+                                        <Typography fontSize={14} color='#585858'>{card.title}</Typography>
+                                        <Typography fontSize={12} color="#8C8C8C" mt={0.5} >
+                                            📅 {card.dateRange}
+                                        </Typography>
+                                    </CardContent>
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: '1rem',
+                                            right: '1rem',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}
+                                        onClick={e => {
+                                            e.stopPropagation();
+                                            handleBookmarkClick(globalIdx);
+                                        }}
+                                    >
+                                        <div style={{
+                                            fontSize: '12px',
+                                            color: '#333'
+                                        }}>12</div>
+                                        {bookmarked[globalIdx] ? (
+                                            <BookmarkIcon sx={{ color: 'black' }} />
+                                        ) : (
+                                            <BookmarkBorderIcon sx={{ color: 'black' }} />
+                                        )}
+                                    </div>
+                                </StyledCard>
+                            );
+                        })}
                     </CardContainer>
                 </div>
                 <PaginationWrapper>
@@ -142,14 +166,15 @@ const ContentWrapper = styled(Box)`
 `;
 
 const SearchSection = styled(Box)`
+  position: relative;
   display: flex;
   justify-content: center;
   margin-bottom: 24px;
 `;
 
 const SearchInput = styled('input')`
-  width: 700px; // 고정 너비로 설정
-  padding: 12px 20px;
+  width: 700px;
+  padding: 12px 44px 12px 20px;
   border: 3px solid #90a4c8;
   border-radius: 30px;
   font-size: 14px;
@@ -160,6 +185,15 @@ const SearchInput = styled('input')`
   &::placeholder {
     color: #898989;
   }
+`;
+
+const SearchIconWrapper = styled('div')`
+  position: absolute;
+  right: 16px;
+  top: 52%;
+  transform: translateY(-50%);
+  color: #90a4c8;
+  cursor: pointer;
 `;
 
 const CardContainer = styled(Box)`

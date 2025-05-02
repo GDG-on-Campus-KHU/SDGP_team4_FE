@@ -135,6 +135,18 @@ export default function MyPage() {
     });
   };
 
+  // 여행 삭제 함수 추가
+  const handleDeleteTravel = async (travelId: number) => {
+    if (!window.confirm('정말 삭제하시겠습니까?')) return;
+    try {
+      await api.delete(`/v1/travel/${travelId}`);
+      setTravels((prev) => prev.filter((t) => t.travelId !== travelId));
+    } catch (error) {
+      alert('삭제에 실패했습니다.');
+      console.error('Error deleting travel:', error);
+    }
+  };
+
   return (
     <Container>
       <Sidebar>
@@ -229,7 +241,12 @@ export default function MyPage() {
                 <Typography fontSize={12} color="#8C8C8C" mt={1}>
                   📅 {formatDateRange(trip.startDate, trip.endDate)}
                 </Typography>
-                <DeleteButton>
+                <DeleteButton
+                  onClick={e => {
+                    e.stopPropagation();
+                    handleDeleteTravel(trip.travelId);
+                  }}
+                >
                   <img src="/icons/trash.svg" alt="delete" />
                 </DeleteButton>
               </CardContent>

@@ -110,7 +110,7 @@ const RightPanel = ({
                 .flatMap(dayPlan => 
                     dayPlan.places.map(place => ({
                         name: place.name,
-                        address: place.address,
+                        address: place.address.split(' ').slice(1).join(' '),
                         description: '',
                         courseDate: dayPlan.date.toISOString().split('T')[0],
                         moveTime: place.travelDuration || 0,
