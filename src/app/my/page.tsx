@@ -175,7 +175,8 @@ export default function MyPage() {
       <MainContent>
         <Typography variant="h6" fontWeight="bold" mb={2}>마이 페이지</Typography>
         <Tabs value={0} sx={{ mb: 2 }}>
-          <Tab label="나의 여행" />
+          <Tab label="여행 계획" />
+          <Tab label="여행 일지" />
           <Tab label="저장한 여행" />
         </Tabs>
         <CardContainer>

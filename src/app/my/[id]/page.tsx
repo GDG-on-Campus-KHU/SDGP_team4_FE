@@ -190,6 +190,7 @@ export default function TripDetailPage() {
                         startDate: tripData.dateRange.split(' ~ ')[0],
                         endDate: tripData.dateRange.split(' ~ ')[1],
                     }}
+                    days={tripData.days}
                 />
             ) : (
                 <>
