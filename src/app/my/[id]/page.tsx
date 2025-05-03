@@ -77,6 +77,7 @@ export default function TripDetailPage() {
         const fetchTripData = async () => {
             try {
                 const { data } = await api.get<ApiResponse>(`/v1/member/travel/${params.id}`);
+                console.log("data:", data);
 
                 // 데이터 구조 변환
                 const formattedData = {
@@ -189,6 +190,7 @@ export default function TripDetailPage() {
                         title: tripData.title,
                         startDate: tripData.dateRange.split(' ~ ')[0],
                         endDate: tripData.dateRange.split(' ~ ')[1],
+                        travelId: params.id as string,
                     }}
                     days={tripData.days}
                 />

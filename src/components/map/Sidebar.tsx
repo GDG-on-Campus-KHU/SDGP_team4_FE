@@ -130,6 +130,11 @@ const Sidebar = ({
   };
 
   useEffect(() => {
+    console.log("selectedPlace:", selectedPlace);
+  }, [selectedPlace]);
+          
+
+  useEffect(() => {
     console.log('planId:', planId);
     if (planId) {
       (async () => {

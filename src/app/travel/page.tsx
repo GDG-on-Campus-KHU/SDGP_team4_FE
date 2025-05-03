@@ -1,51 +1,66 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Typography, Card, CardContent, CardMedia, Avatar, Pagination } from '@mui/material';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import SearchIcon from '@mui/icons-material/Search';
 import { useRouter } from 'next/navigation';
 import styled from '@emotion/styled';
-
-interface TravelCardData {
-    id: number;
-    region: string;
-    title: string;
-    dateRange: string;
-    thumbnail: string;
-    author: string;
-    avatar: string;
-}
-
-const dummyData: TravelCardData[] = Array.from({ length: 24 }, (_, i) => ({
-    id: i + 1,
-    region: '부산광역시',
-    title: '부산여행 추천하는 명소들!',
-    dateRange: '2025-03-25 ~ 2025-03-27',
-    thumbnail: '/page.png',
-    author: '뿌리',
-    avatar: '/sample-avatar.jpg',
-}));
+import api from '@/utils/axios';
+import CircularProgress from '@mui/material/CircularProgress';
 
 const TravelPage = () => {
     const itemsPerPage = 9;
     const [page, setPage] = useState(1);
     const router = useRouter();
-    const [bookmarked, setBookmarked] = useState<boolean[]>(Array(dummyData.length).fill(false));
+    const [bookmarked, setBookmarked] = useState<boolean[]>([]);
+    const [posts, setPosts] = useState<any[]>([]);
+    const [totalCount, setTotalCount] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
         setPage(value);
     };
 
-    const handleBookmarkClick = (idx: number) => {
-        setBookmarked(prev => {
-            const updated = [...prev];
-            updated[idx] = !updated[idx];
-            return updated;
-        });
+    const handleBookmarkClick = async (idx: number, postId: number) => {
+        try {
+            const res = await api.post(`/v1/post/${postId}`);
+            const { likeCount } = (res.data as any).data || (res.data as any);
+            setPosts(prev => prev.map((p, i) =>
+                i === idx
+                    ? { ...p, isMyLike: !p.isMyLike, likeCount }
+                    : p
+            ));
+        } catch (e: any) {
+            alert('좋아요 처리 실패: ' + (e.response?.data?.message || e.message));
+        }
     };
 
-    const paginatedData = dummyData.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+    useEffect(() => {
+        const fetchPosts = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const res = await api.get(`/v1/post?page=${page - 1}&size=${itemsPerPage}`);
+                const data: any = res.data;
+                // 서버 응답 구조에 맞게 변환 (필요시 매핑)
+                const content = data.data?.content || data.content || [];
+                setPosts(content);
+                setTotalCount(data.data?.totalElements || data.totalElements || 0);
+                setBookmarked(content.map((p: any) => p.isMyLike));
+            } catch (e: any) {
+                setError(e.response?.data?.message || e.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchPosts();
+    }, [page]);
+
+    useEffect(() => {
+        console.log("posts:", posts);
+    }, [posts]);
 
     return (
         <Wrapper>
@@ -56,20 +71,28 @@ const TravelPage = () => {
                         <SearchIcon sx={{fontSize: '28px'}}/>
                     </SearchIconWrapper>
                 </SearchSection>
+                {loading ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', width: '100%' }}>
+                        <CircularProgress />
+                    </div>
+                ) : (
+                <>
                 <div style={{ marginTop: '50px' }}>
                     <SortTabs>
                         <Typography variant="body2" fontWeight={600}>최신순</Typography>
                         <Divider>|</Divider>
                         <Typography variant="body2">인기순</Typography>
                     </SortTabs>
+                    {error ? (
+                        <div style={{ color: 'red' }}>에러: {error}</div>
+                    ) : (
                     <CardContainer>
-                        {paginatedData.map((card, idx) => {
-                            const globalIdx = (page - 1) * itemsPerPage + idx;
+                        {posts.map((card, idx) => {
                             return (
-                                <StyledCard key={card.id} onClick={() => router.push(`/travel/${card.id}`)}>
-                                    <CardMedia
+                                <StyledCard key={card.postId} onClick={() => router.push(`/travel/${card.postId}`)}>
+                                    {/* <CardMedia
                                         component="img"
-                                        image={card.thumbnail}
+                                        image={card.thumbnail || '/page.png'}
                                         alt={card.title}
                                         sx={{
                                             width: "120px",
@@ -78,7 +101,7 @@ const TravelPage = () => {
                                             objectFit: 'cover',
                                             marginRight: "16px"
                                         }}
-                                    />
+                                    /> */}
                                     <CardContent
                                         sx={{
                                             padding: 0,
@@ -92,13 +115,13 @@ const TravelPage = () => {
                                         }}
                                     >
                                         <AuthorInfo>
-                                            <Avatar src={card.avatar} sx={{ width: 24, height: 24 }} />
-                                            <Typography fontSize={12} ml={0.5}>{card.author}</Typography>
+                                            <Avatar src={card.avatar || '/sample-avatar.jpg'} sx={{ width: 24, height: 24 }} />
+                                            <Typography fontSize={12} ml={0.5}>{card.author || '익명'}</Typography>
                                         </AuthorInfo>
-                                        <Typography fontSize={18} fontWeight="500" color="black" mt={1.5}>{card.region}</Typography>
+                                        <Typography fontSize={18} fontWeight="500" color="black" mt={1.5}>{card.region || '부산광역시'}</Typography>
                                         <Typography fontSize={14} color='#585858'>{card.title}</Typography>
                                         <Typography fontSize={12} color="#8C8C8C" mt={0.5} >
-                                            📅 {card.dateRange}
+                                            📅 {card.dateRange || '2025-03-25 ~ 2025-03-27'}
                                         </Typography>
                                     </CardContent>
                                     <div
@@ -113,14 +136,14 @@ const TravelPage = () => {
                                         }}
                                         onClick={e => {
                                             e.stopPropagation();
-                                            handleBookmarkClick(globalIdx);
+                                            handleBookmarkClick(idx, card.postId);
                                         }}
                                     >
                                         <div style={{
                                             fontSize: '12px',
                                             color: '#333'
-                                        }}>12</div>
-                                        {bookmarked[globalIdx] ? (
+                                        }}>{card.likeCount ?? 0}</div>
+                                        {card.isMyLike ? (
                                             <BookmarkIcon sx={{ color: 'black' }} />
                                         ) : (
                                             <BookmarkBorderIcon sx={{ color: 'black' }} />
@@ -130,6 +153,7 @@ const TravelPage = () => {
                             );
                         })}
                     </CardContainer>
+                    )}
                 </div>
                 <PaginationWrapper>
                     <Pagination
@@ -139,11 +163,13 @@ const TravelPage = () => {
                                 borderColor: '#C1C1C1',
                             },
                         }}
-                        count={Math.ceil(dummyData.length / itemsPerPage)}
+                        count={Math.ceil(totalCount / itemsPerPage)}
                         page={page}
                         onChange={handlePageChange}
                     />
                 </PaginationWrapper>
+                </>
+                )}
             </ContentWrapper>
         </Wrapper>
     );

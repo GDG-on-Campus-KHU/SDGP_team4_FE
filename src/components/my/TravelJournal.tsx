@@ -9,6 +9,7 @@ import '@toast-ui/editor/dist/i18n/ko-kr';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import TravelPlanViewer from '@/components/common/TravelPlanViewer';
+import api from '@/utils/axios';
 
 interface Place {
   name: string;
@@ -27,6 +28,7 @@ interface TravelJournalProps {
     title: string;
     startDate: string;
     endDate: string;
+    travelId: string;
   };
   days: Day[];
 }
@@ -35,11 +37,20 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
   const [title, setTitle] = useState('');
   const editorRef = useRef<Editor>(null);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    console.log("dfdf", travelInfo.travelId);
     const editorInstance = editorRef.current?.getInstance();
-    const content = editorInstance?.getMarkdown();
-    console.log('Content:', content);
-    // 여기에 저장 로직 추가
+    const html = editorInstance?.getHTML();
+    try {
+      const res = await api.post(`/v1/travel/${travelInfo.travelId}/post`, {
+        title,
+        description: html,
+      });
+      console.log("res:", res);
+      alert('게시글로 전환 성공!');
+    } catch (e: any) {
+      alert('게시글 전환 실패: ' + (e.response?.data?.message || e.message));
+    }
   };
 
   return (

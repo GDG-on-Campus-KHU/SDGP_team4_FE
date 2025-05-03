@@ -95,6 +95,7 @@ export default function MyPage() {
       const { data } = await api.get<TravelResponse>('/v1/member/travel');
 
       if (data?.data?.content) {
+        console.log("data.data.content:", data.data.content);
         setTravels(data.data.content);
       } else {
         console.error('Unexpected API response structure:', data);
@@ -187,8 +188,7 @@ export default function MyPage() {
       <MainContent>
         <Typography variant="h6" fontWeight="bold" mb={2}>마이 페이지</Typography>
         <Tabs value={0} sx={{ mb: 2 }}>
-          <Tab label="여행 계획" />
-          <Tab label="여행 일지" />
+          <Tab label="나의 여행" />
           <Tab label="저장한 여행" />
         </Tabs>
         <CardContainer>
