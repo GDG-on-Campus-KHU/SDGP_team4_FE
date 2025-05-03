@@ -11,6 +11,7 @@ import Sidebar from '@/components/map/Sidebar';
 import RightPanel from '@/components/map/RightPanel';
 import { TransportMode, PlaceItem, DayPlan, Plan } from '@/type/plan';
 import ChatIcon from '@mui/icons-material/Chat';
+import api from '@/utils/axios';
 
 const containerStyle = {
   width: '100%',
@@ -55,6 +56,9 @@ export default function MapPage() {
 
   // 새로운 마커 애니메이션을 위한 state 추가
   const [newPlaceId, setNewPlaceId] = useState<string | null>(null);
+
+  // 1. mapPins 상태 추가
+  const [mapPins, setMapPins] = useState<{ placeId: number; latitude: number; longitude: number; commentsCnt: number }[]>([]);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: 'AIzaSyDx01yI23584jz6SnjWsltrVrl0vkQve6U',
@@ -406,6 +410,38 @@ export default function MapPage() {
     setTransportMode(mode);
   }, [dayPlans, calculateTravelTime]);
 
+  // 2. 지도 onIdle에서 bounds로 API 요청
+  const handleMapIdle = useCallback(async () => {
+    if (!map) return;
+    const bounds = map.getBounds();
+    if (!bounds) return;
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+
+    const minLat = sw.lat();
+    const maxLat = ne.lat();
+    const minLng = sw.lng();
+    const maxLng = ne.lng();
+
+    try {
+      const res = await api.get(`/map/places/pin?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
+      const data = res.data;
+      if (Array.isArray(data)) {
+        setMapPins(data.filter((pin: any) => pin.commentsCnt > 0));
+      } else {
+        setMapPins([]);
+        console.error(data);
+      }
+    } catch (e: any) {
+      if (e.response) {
+        console.error('핀 목록 조회 실패:', e.response.status, e.response.data);
+      } else {
+        console.error('핀 목록 조회 실패:', e);
+      }
+      setMapPins([]);
+    }
+  }, [map]);
+
   if (!isLoaded) return <div>지도를 불러오는 중...</div>;
 
   return (
@@ -416,6 +452,7 @@ export default function MapPage() {
           center={center}
           zoom={13}
           onLoad={onMapLoad}
+          onIdle={handleMapIdle}
         >
           {/* 선택된 날짜의 장소들 표시 */}
           {getCurrentDayMarkers().map((place, index) => (
@@ -463,6 +500,27 @@ export default function MapPage() {
               animation={google.maps.Animation.DROP}
             />
           )}
+
+          {/* 4. mapPins로 받은 장소 마커 렌더링 (댓글 1개 이상) */}
+          {mapPins.map((pin) => (
+            <OverlayView
+              key={pin.placeId}
+              position={{ lat: pin.latitude, lng: pin.longitude }}
+              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+              getPixelPositionOffset={(width, height) => ({
+                x: -(width / 2),
+                y: -height
+              })}
+            >
+              <MarkerContainer isNew={false}>
+                <NumberMarker />
+                <CommentBubble>
+                  <ChatIcon fontSize='small'/>
+                  {pin.commentsCnt}
+                </CommentBubble>
+              </MarkerContainer>
+            </OverlayView>
+          ))}
         </GoogleMap>
       </MapWrapper>
       <Sidebar

@@ -3,16 +3,17 @@ import styled from '@emotion/styled';
 import ChatIcon from '@mui/icons-material/Chat';
 
 interface CommentSectionProps {
+    comments: { nickname: string; date: string; text: string }[];
     // 필요한 props 추가 가능
 }
 
-const CommentSection = () => {
+const CommentSection = ({ comments }: CommentSectionProps) => {
     return (
         <CommentContainer>
             <CommentHeader>
                 <CommentCount>
                     <ChatIcon fontSize="small" />
-                    24
+                    {comments.length}
                 </CommentCount>
                 <TabContainer>
                     <CommentTabs>
@@ -27,17 +28,18 @@ const CommentSection = () => {
                 </TabContainer>
             </CommentHeader>
             <CommentList>
-                <CommentItem>
-                    <CommentAvatar />
-                    <CommentContent>
-                        <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
-                            <CommentAuthor>여행을좋아하는구리</CommentAuthor>
-                            <CommentDate>2025-03-31</CommentDate>
-                        </div>
-                        <CommentText>가봤는데 생각보다 별로였음 ㅜ</CommentText>
-                    </CommentContent>
-                </CommentItem>
-                {/* 더미 댓글 추가 가능 */}
+                {comments.map((comment, i) => (
+                    <CommentItem key={i}>
+                        <CommentAvatar />
+                        <CommentContent>
+                            <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
+                                <CommentAuthor>{comment.nickname}</CommentAuthor>
+                                <CommentDate>{comment.date}</CommentDate>
+                            </div>
+                            <CommentText>{comment.text}</CommentText>
+                        </CommentContent>
+                    </CommentItem>
+                ))}
             </CommentList>
         </CommentContainer>
     );
@@ -131,16 +133,16 @@ const CommentContent = styled.div`
   width: 100%;
 `;
 
-const CommentAuthor = styled.span`
-  font-size: 10px;
-  font-weight: 500;
-  color: #000000;
-`;
-
 const CommentText = styled.p`
   font-size: 11px;
   color: #000000;
   margin: 0;
+`;
+
+const CommentAuthor = styled.span`
+  font-size: 10px;
+  font-weight: 500;
+  color: #000000;
 `;
 
 const CommentDate = styled.span`
