@@ -16,6 +16,7 @@ interface TravelInfoDto {
     startDate: string;
     endDate: string;
     isPost: boolean;
+    area: string;
 }
 
 interface CourseInfoDto {
@@ -67,6 +68,8 @@ export default function TripDetailPage() {
     const [editingMemo, setEditingMemo] = useState<number | null>(null);
     const [memoText, setMemoText] = useState<string>('');
     const [tripData, setTripData] = useState<{
+        isPost: boolean;
+        area: string;
         title: string;
         dateRange: string;
         days: { date: string; places: CourseInfoDto[] }[];
@@ -81,6 +84,8 @@ export default function TripDetailPage() {
 
                 // 데이터 구조 변환
                 const formattedData = {
+                    isPost: data.data.travelInfoDto.isPost,
+                    area: data.data.travelInfoDto.area,
                     title: data.data.travelInfoDto.title,
                     dateRange: `${data.data.travelInfoDto.startDate} ~ ${data.data.travelInfoDto.endDate}`,
                     days: groupCoursesByDate(data.data.courseInfoDtoList)
@@ -187,6 +192,7 @@ export default function TripDetailPage() {
                 <TravelJournal
                     onClose={() => setIsWritingJournal(false)}
                     travelInfo={{
+                        area: tripData.area,
                         title: tripData.title,
                         startDate: tripData.dateRange.split(' ~ ')[0],
                         endDate: tripData.dateRange.split(' ~ ')[1],
@@ -199,7 +205,7 @@ export default function TripDetailPage() {
                     <HeaderContainer>
                         <Header>
                             <div>
-                                <Typography variant="h5" fontWeight={500}>{tripData.title}</Typography>
+                                <Typography variant="h5" fontWeight={500}>{tripData.area}</Typography>
                                 <DateRange>
                                     <CalendarIcon>📅</CalendarIcon>
                                     {tripData.dateRange}
@@ -208,12 +214,21 @@ export default function TripDetailPage() {
                             </div>
                             <ButtonContainer>
                                 <StyledButton variant="outlined">장소 수정하기</StyledButton>
-                                <StyledButton
-                                    variant="contained"
-                                    onClick={() => setIsWritingJournal(true)}
-                                >
-                                    여행일지 쓰기
-                                </StyledButton>
+                                {tripData.isPost ? (
+                                    <StyledButton
+                                        variant="contained"
+                                        
+                                    >
+                                        여행일지 보기
+                                    </StyledButton>
+                                ) : (
+                                    <StyledButton
+                                        variant="contained"
+                                        onClick={() => setIsWritingJournal(true)}
+                                    >
+                                        여행일지 쓰기
+                                    </StyledButton>
+                                )}
                             </ButtonContainer>
                         </Header>
                     </HeaderContainer>

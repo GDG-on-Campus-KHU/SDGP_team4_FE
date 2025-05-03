@@ -16,6 +16,7 @@ interface TravelContent {
   startDate: string;
   endDate: string;
   isPost: boolean;
+  area: string;
 }
 
 interface PageableSort {
@@ -204,7 +205,8 @@ export default function MyPage() {
                   image={trip.thumbnail}
                   alt={trip.title}
                   sx={{
-                    width: "120px",
+                    width: "100px",
+                    height: "100px",
                     borderRadius: "5px",
                     backgroundColor: '#f5f5f5',
                     objectFit: 'cover',
@@ -228,7 +230,7 @@ export default function MyPage() {
                   fontWeight="500"
                   color="black"
                 >
-                  {trip.title}
+                  {trip.area}
                 </Typography>
                 <Typography
                   fontSize={14}

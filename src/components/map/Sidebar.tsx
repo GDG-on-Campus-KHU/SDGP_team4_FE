@@ -18,8 +18,12 @@ interface SidebarProps {
     address: string;
     location?: { lat: number | (() => number); lng: number | (() => number) };
     photos?: google.maps.places.PlacePhoto[];
+    imgUrls?: string[];
   } | null;
   onAddPlace: () => void;
+  selectedPlaceId?: number | null;
+  setSelectedPlaceId?: React.Dispatch<React.SetStateAction<number | null>>;
+  isLoading?: boolean;
 }
 
 const Sidebar = ({
@@ -30,6 +34,9 @@ const Sidebar = ({
   setPlaceName,
   selectedPlace,
   onAddPlace,
+  selectedPlaceId,
+  setSelectedPlaceId,
+  isLoading = false,
 }: SidebarProps) => {
   // 상태 추가
   const [isPlaceRegistered, setIsPlaceRegistered] = useState(false);
@@ -38,11 +45,32 @@ const Sidebar = ({
   const [comments, setComments] = useState<{ nickname: string; date: string; text: string }[]>([]);
   const [commentInput, setCommentInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [placeInfo, setPlaceInfo] = useState<{ commentsCnt: number; best: number; good: number; soso: number; bad: number } | null>(null);
+  const [placeInfo, setPlaceInfo] = useState<{ 
+    commentsCnt: number; 
+    best: number; 
+    good: number; 
+    soso: number; 
+    bad: number;
+    imgUrls?: string[];
+  } | null>(null);
+
+  // selectedPlaceId가 변경될 때 해당 장소 정보 가져오기
+  useEffect(() => {
+    // 마커에서 선택된 장소가 있으면 해당 ID를 planId로 설정
+    if (selectedPlaceId) {
+      setPlanId(selectedPlaceId);
+      setIsPlaceRegistered(true);
+
+      // // 감정 상태 초기화
+      // setEmotions({ best: 0, good: 0, soso: 0, bad: 0 });
+      // setComments([]);
+    }
+  }, [selectedPlaceId]);
 
   // 장소 등록 및 planId 반환
   const registerPlaceIfNeeded = async (afterRegister?: (newPlanId: number) => Promise<void>) => {
-    if (isPlaceRegistered && planId) return planId;
+    if (isPlaceRegistered && planId && !needsRegister()) return planId;
+
     setLoading(true);
     try {
       let latitude = 0;
@@ -53,25 +81,69 @@ const Sidebar = ({
         latitude = typeof latVal === 'function' ? latVal() : latVal;
         longitude = typeof lngVal === 'function' ? lngVal() : lngVal;
       }
-      const res = await api.post('/places', {
+
+      // 이미지 URL을 8등분으로 쪼개서 배열로 저장
+      const imgUrls: string[] = [];
+      if (selectedPlace?.photos && selectedPlace.photos[0]) {
+        try {
+          const fullUrl = selectedPlace.photos[0].getUrl();
+          console.log('원본 URL 길이:', fullUrl.length);
+
+          // URL을 8등분으로 쪼개기
+          const chunkSize = Math.ceil(fullUrl.length / 8);
+          for (let i = 0; i < 8; i++) {
+            const start = i * chunkSize;
+            const end = Math.min(start + chunkSize, fullUrl.length);
+            const chunk = fullUrl.substring(start, end);
+            imgUrls.push(chunk);
+          }
+
+          console.log('URL 분할 결과:', {
+            totalChunks: imgUrls.length,
+            chunkSizes: imgUrls.map(chunk => chunk.length)
+          });
+        } catch (e) {
+          console.error('이미지 URL 추출 및 분할 오류:', e);
+          // 오류 발생 시 빈 배열 사용
+          imgUrls.length = 0;
+        }
+      }
+
+      console.log('장소 등록 요청:', {
         name: selectedPlace?.name,
         address: selectedPlace?.address,
         latitude,
         longitude,
+        imgUrlsCount: imgUrls.length
       });
+
+      const res = await api.post('/v1/places', {
+        name: selectedPlace?.name,
+        address: selectedPlace?.address,
+        latitude,
+        longitude,
+        imgUrls // 쪼개진 URL 조각들이 담긴 배열 전송
+      });
+
       if (res.status === 200) {
-        const data = res.data as { planId: number, commentsCnt: number };
+        const data = res.data as { placeId: number, commentsCnt: number };
+        console.log('장소 등록 성공:', data);
+
         setIsPlaceRegistered(true);
-        setPlanId(data.planId);
+        setPlanId(data.placeId);
+
         if (afterRegister) {
-          await afterRegister(data.planId);
+          await afterRegister(data.placeId);
         }
-        return data.planId;
+
+        return data.placeId;
       } else {
+        console.error('장소 등록 실패:', res);
         alert('장소 등록에 실패했습니다.');
         return null;
       }
     } catch (e) {
+      console.error('장소 등록 오류:', e);
       alert('장소 등록 중 오류가 발생했습니다.');
       return null;
     } finally {
@@ -80,86 +152,194 @@ const Sidebar = ({
   };
 
   const actuallyAddComment = async (id: number) => {
-    const memberId = localStorage.getItem('nickname') || '';
-    const region = localStorage.getItem('region') || '';
-    const address = selectedPlace?.address || '';
-    const isLocal = region && address.includes(region);
-    const res = await api.post('/comments', {
-      placeId: id,
-      memberId,
-      isLocal,
-      comment: commentInput,
-    });
-    console.log('댓글 등록 응답:', res);
-    setComments(prev => [...prev, { nickname: memberId, date: new Date().toISOString(), text: commentInput }]);
-    setCommentInput('');
+    try {
+      const memberId = localStorage.getItem('nickname') || '';
+      const region = localStorage.getItem('region') || '';
+      const address = selectedPlace?.address || '';
+      const isLocal = region && address.includes(region);
+
+      console.log('댓글 등록 시작:', {
+        placeId: id,
+        isLocal,
+        comment: commentInput
+      });
+
+      const res = await api.post('/v1/comments', {
+        placeId: id,
+        isLocal,
+        comment: commentInput,
+      });
+
+      // 응답 상태가 200인 경우에만 성공 처리
+      if (res.status === 200) {
+        console.log('댓글 등록 성공:', res.data);
+
+        // 댓글 등록 후 UI 업데이트
+        setComments(prev => [...prev, {
+          nickname: memberId,
+          date: new Date().toISOString(),
+          text: commentInput
+        }]);
+
+        // 장소 정보 업데이트 (댓글 수 증가)
+        if (placeInfo) {
+          setPlaceInfo({
+            ...placeInfo,
+            commentsCnt: placeInfo.commentsCnt + 1
+          });
+        }
+
+        setCommentInput('');
+        return true;
+      } else {
+        console.error('댓글 등록 실패:', res);
+        alert('댓글 등록에 실패했습니다.');
+        return false;
+      }
+    } catch (e) {
+      console.error('댓글 등록 오류:', e);
+      alert('댓글 등록 중 오류가 발생했습니다.');
+      return false;
+    }
   };
 
   const handleAddComment = async () => {
-    if (!commentInput.trim()) return;
-    let id = planId;
-    let needRegister = !isPlaceRegistered || !planId || needsRegister();
-    if (needRegister) {
-      await registerPlaceIfNeeded(async (newPlanId) => {
-        await actuallyAddComment(newPlanId);
-      });
-      return;
+    if (!commentInput.trim() || loading) return;
+
+    setLoading(true);
+    try {
+      // 장소 등록이 필요한지 확인
+      const needRegister = !isPlaceRegistered || !planId || needsRegister();
+
+      if (needRegister) {
+        console.log('장소 등록이 필요합니다');
+        // 콜백 방식으로 변경하여 실행 순서 보장
+        await registerPlaceIfNeeded(async (newPlanId) => {
+          console.log('장소 등록 후 댓글 등록 시작, planId:', newPlanId);
+          await actuallyAddComment(newPlanId);
+        });
+      } else if (planId) {
+        console.log('장소가 이미 등록되어 있습니다, planId:', planId);
+        await actuallyAddComment(planId);
+      }
+    } catch (error) {
+      console.error('댓글 등록 프로세스 오류:', error);
+      alert('댓글을 등록하는 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
-    await actuallyAddComment(id!);
   };
 
   const actuallyAddEmotion = async (id: number, type: 'best' | 'good' | 'soso' | 'bad') => {
-    const memberId = localStorage.getItem('nickname') || '';
-    const feedbackType = type.toUpperCase(); // BEST, GOOD, SOSO, BAD
-    const res = await api.post(`/places/${id}/feedbacks?memberId=${memberId}&feedbackType=${feedbackType}`);
-    console.log('감정 등록 응답:', res);
-    setEmotions(prev => ({ ...prev, [type]: prev[type] + 1 }));
+    try {
+      const feedbackType = type.toUpperCase(); // BEST, GOOD, SOSO, BAD
+      
+      console.log('감정 등록 시작:', {
+        placeId: id,
+        feedbackType
+      });
+      
+      setEmotions(prev => ({ ...prev, [type]: prev[type] + 1 }));
+      
+      // 장소 정보 업데이트
+      if (placeInfo) {
+        setPlaceInfo({
+          ...placeInfo,
+          [type]: placeInfo[type] + 1
+        });
+      }
+      
+      // API 요청
+      const res = await api.post(`/v1/places/${id}/feedbacks?feedbackType=${feedbackType}`);
+      //console.log("res:", res);
+      
+      return true;
+    } catch (e: any) {
+      //console.error('감정 등록 오류:', e);
+    }
   };
 
   const handleEmotion = async (type: 'best' | 'good' | 'soso' | 'bad') => {
-    let id = planId;
-    console.log('planId:', planId);
-    let needRegister = !isPlaceRegistered || !planId || needsRegister();
-    if (needRegister) {
-      await registerPlaceIfNeeded(async (newPlanId) => {
-        await actuallyAddEmotion(newPlanId, type);
-      });
-      return;
+    if (loading) return;
+    
+    setLoading(true);
+    try {
+      console.log('감정 표현 요청 시작:', { type, planId, isPlaceRegistered });
+      
+      // 장소가 등록되어 있는지 확인
+      if (isPlaceRegistered && planId) {
+        console.log('장소가 이미 등록되어 있습니다, planId:', planId);
+        await actuallyAddEmotion(planId, type);
+      } else {
+        console.log('장소 등록이 필요합니다');
+        // 콜백 방식으로 변경하여 실행 순서 보장
+        await registerPlaceIfNeeded(async (newPlanId) => {
+          console.log('장소 등록 후 감정 등록 시작, planId:', newPlanId);
+          await actuallyAddEmotion(newPlanId, type);
+        });
+      }
+    } catch (error) {
+    } finally {
+      setLoading(false);
     }
-    await actuallyAddEmotion(id!, type);
   };
 
   useEffect(() => {
     console.log("selectedPlace:", selectedPlace);
-  }, [selectedPlace]);
-          
-
-  useEffect(() => {
-    console.log('planId:', planId);
-    if (planId) {
-      (async () => {
-        try {
-          const res = await api.get(`/places/${planId}`);
-          const data = res.data as { commentsCnt?: number; best?: number; good?: number; soso?: number; bad?: number };
-          setPlaceInfo({
-            commentsCnt: data.commentsCnt ?? 0,
-            best: data.best ?? 0,
-            good: data.good ?? 0,
-            soso: data.soso ?? 0,
-            bad: data.bad ?? 0,
-          });
-          console.log('장소 상세 정보:', data);
-        } catch (e) {
-          setPlaceInfo(null);
-        }
-      })();
+    // 장소가 변경되면 등록 여부와 planId를 초기화
+    if (selectedPlace) {
+      setIsPlaceRegistered(false);
+      setPlanId(null);
+      setEmotions({ best: 0, good: 0, soso: 0, bad: 0 });
+      setComments([]);
+      setPlaceInfo(null);
     }
-  }, [planId]);
+  }, [selectedPlace?.name, selectedPlace?.address]); // 장소 이름이나 주소가 변경될 때만 실행
+
+
+  // useEffect(() => {
+  //   console.log('planId:', planId);
+  //   if (planId) {
+  //     (async () => {
+  //       try {
+  //         const res = await api.get(`/v1/places/${planId}`);
+  //         const data = res.data as { 
+  //           commentsCnt?: number; 
+  //           best?: number; 
+  //           good?: number; 
+  //           soso?: number; 
+  //           bad?: number;
+  //           imgUrls?: string[];
+  //         };
+  //         setPlaceInfo({
+  //           commentsCnt: data.commentsCnt ?? 0,
+  //           best: data.best ?? 0,
+  //           good: data.good ?? 0,
+  //           soso: data.soso ?? 0,
+  //           bad: data.bad ?? 0,
+  //           imgUrls: data.imgUrls ?? [],
+  //         });
+  //         console.log('장소 상세 정보:', data);
+  //       } catch (e) {
+  //         setPlaceInfo(null);
+  //       }
+  //     })();
+  //   }
+  // }, [planId]);
 
   const needsRegister = () => {
-    if (!placeInfo) return true;
-    const { commentsCnt, best, good, soso, bad } = placeInfo;
-    return commentsCnt === 0 && best === 0 && good === 0 && soso === 0 && bad === 0;
+    // placeInfo가 없거나 planId가 없는 경우에만 등록 필요
+    return !placeInfo || !planId;
+  };
+
+  // 이미지 URL 조각을 합치는 함수
+  const getCombinedImageUrl = () => {
+    if (placeInfo?.imgUrls && placeInfo.imgUrls.length > 0) {
+      console.log("placeInfo.imgUrls:", placeInfo.imgUrls.join(''));
+
+      return placeInfo.imgUrls.join('');
+    }
+    return null;
   };
 
   return (
@@ -173,46 +353,60 @@ const Sidebar = ({
         />
         {(selectedPlace) ? (
           <PlaceInfo>
-            <PlaceHeader>
-              <div>
-                <PlaceName>{selectedPlace.name}</PlaceName>
-                <PlaceAddress>{selectedPlace.address}</PlaceAddress>
-              </div>
-              <AddPlaceButton onClick={onAddPlace}>
-                <AddIcon sx={{ fontSize: 26, color: '#9A9A9A' }} />
-              </AddPlaceButton>
-            </PlaceHeader>
-            {selectedPlace.photos && selectedPlace.photos[0] && (
-              <PlaceImage
-                src={selectedPlace.photos[0].getUrl()}
-                alt={selectedPlace.name}
-              />
+            {isLoading || loading ? (
+              <LoadingContainer>
+                <div className="loading-spinner"></div>
+                <div>장소 정보를 불러오는 중...</div>
+              </LoadingContainer>
+            ) : (
+              <>
+                <PlaceHeader>
+                  <div>
+                    <PlaceName>{selectedPlace.name}</PlaceName>
+                    <PlaceAddress>{selectedPlace.address}</PlaceAddress>
+                  </div>
+                  <AddPlaceButton onClick={onAddPlace}>
+                    <AddIcon sx={{ fontSize: 26, color: '#9A9A9A' }} />
+                  </AddPlaceButton>
+                </PlaceHeader>
+                {selectedPlace?.photos && selectedPlace.photos[0] ? (
+                  <PlaceImage
+                    src={selectedPlace.photos[0].getUrl()}
+                    alt={selectedPlace.name}
+                  />
+                ) : selectedPlace.imgUrls && selectedPlace.imgUrls.length > 0 ? (
+                  <PlaceImage
+                    src={selectedPlace.imgUrls.join('') || ''}
+                    alt={selectedPlace.name || '장소 이미지'}
+                  />
+                ) : null}
+                <EmotionContainer>
+                  <EmotionButton disabled={loading} onClick={() => handleEmotion('best')}>
+                    <img src="/icons/emotion/best.svg" alt="최고예요" />
+                    <span className="emotion-text">최고예요</span>
+                    <span className="emotion-count">{emotions.best}</span>
+                  </EmotionButton>
+                  <EmotionButton disabled={loading} onClick={() => handleEmotion('good')}>
+                    <img src="/icons/emotion/good.svg" alt="좋아요" />
+                    <span className="emotion-text">좋아요</span>
+                    <span className="emotion-count">{emotions.good}</span>
+                  </EmotionButton>
+                  <EmotionButton disabled={loading} onClick={() => handleEmotion('soso')}>
+                    <img src="/icons/emotion/soso.svg" alt="그저 그래요" />
+                    <span className="emotion-text">그저 그래요</span>
+                    <span className="emotion-count">{emotions.soso}</span>
+                  </EmotionButton>
+                  <EmotionButton disabled={loading} onClick={() => handleEmotion('bad')}>
+                    <img src="/icons/emotion/bad.svg" alt="별로예요" />
+                    <span className="emotion-text">별로예요</span>
+                    <span className="emotion-count">{emotions.bad}</span>
+                  </EmotionButton>
+                </EmotionContainer>
+                <Divider />
+                {/* 댓글 리스트 */}
+                <CommentSection comments={comments} />
+              </>
             )}
-            <EmotionContainer>
-              <EmotionButton disabled={loading} onClick={() => handleEmotion('best')}>
-                <img src="/icons/emotion/best.svg" alt="최고예요" />
-                <span className="emotion-text">최고예요</span>
-                <span className="emotion-count">{emotions.best}</span>
-              </EmotionButton>
-              <EmotionButton disabled={loading} onClick={() => handleEmotion('good')}>
-                <img src="/icons/emotion/good.svg" alt="좋아요" />
-                <span className="emotion-text">좋아요</span>
-                <span className="emotion-count">{emotions.good}</span>
-              </EmotionButton>
-              <EmotionButton disabled={loading} onClick={() => handleEmotion('soso')}>
-                <img src="/icons/emotion/soso.svg" alt="그저 그래요" />
-                <span className="emotion-text">그저 그래요</span>
-                <span className="emotion-count">{emotions.soso}</span>
-              </EmotionButton>
-              <EmotionButton disabled={loading} onClick={() => handleEmotion('bad')}>
-                <img src="/icons/emotion/bad.svg" alt="별로예요" />
-                <span className="emotion-text">별로예요</span>
-                <span className="emotion-count">{emotions.bad}</span>
-              </EmotionButton>
-            </EmotionContainer>
-            <Divider />
-            {/* 댓글 리스트 */}
-            <CommentSection comments={comments} />
           </PlaceInfo>
         ) : (
           <GuideBox>
@@ -222,7 +416,7 @@ const Sidebar = ({
         )}
       </ContentContainer>
       {/* 댓글 입력 */}
-      {(selectedPlace) ? (
+      {(selectedPlace && !isLoading) ? (
         <CommentInput>
           <input
             type="text"
@@ -238,8 +432,7 @@ const Sidebar = ({
   );
 };
 
-const SidebarWrapper = styled(Box) <{ open: boolean }>`
-  position: absolute;
+const SidebarWrapper = styled(Box) <{ open: boolean }>`  position: absolute;
   top: 0;
   left: 0;
   width: ${(props) => (props.open ? '320px' : '0')};
@@ -376,6 +569,31 @@ const CommentInput = styled.div`
     &:hover {
       background-color: #90a4c8;
     }
+  }
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 0;
+  gap: 16px;
+  color: #9A9A9A;
+  font-size: 14px;
+  
+  .loading-spinner {
+    width: 30px;
+    height: 30px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #90a4c8;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 `;
 

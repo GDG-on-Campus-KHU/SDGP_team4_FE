@@ -28,6 +28,7 @@ interface SelectedPlace {
   address: string;
   location?: google.maps.LatLng;
   photos?: google.maps.places.PlacePhoto[];
+  imgUrls?: string[];
 }
 
 export default function MapPage() {
@@ -59,6 +60,10 @@ export default function MapPage() {
 
   // 1. mapPins 상태 추가
   const [mapPins, setMapPins] = useState<{ placeId: number; latitude: number; longitude: number; commentsCnt: number }[]>([]);
+
+  // 선택된 장소의 placeId 저장 (API 요청용)
+  const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
+  const [isPlaceLoading, setIsPlaceLoading] = useState(false);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: 'AIzaSyDx01yI23584jz6SnjWsltrVrl0vkQve6U',
@@ -424,10 +429,12 @@ export default function MapPage() {
     const maxLng = ne.lng();
 
     try {
-      const res = await api.get(`/map/places/pin?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
+      const res = await api.get(`/v1/map/places/pin?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
       const data = res.data;
+      console.log("data:", data);
       if (Array.isArray(data)) {
-        setMapPins(data.filter((pin: any) => pin.commentsCnt > 0));
+        //setMapPins(data.filter((pin: any) => pin.commentsCnt > 0));
+        setMapPins(data);
       } else {
         setMapPins([]);
         console.error(data);
@@ -441,6 +448,65 @@ export default function MapPage() {
       setMapPins([]);
     }
   }, [map]);
+
+  // 마커 클릭 핸들러 추가
+  const handleMarkerClick = useCallback(async (pin: { placeId: number; latitude: number; longitude: number; commentsCnt: number }) => {
+    // 이미 선택된 장소면 무시
+    if (selectedPlaceId === pin.placeId) return;
+    
+    setIsPlaceLoading(true);
+    try {
+      // 해당 placeId로 장소 정보 API 요청
+      const res = await api.get(`/v1/places/${pin.placeId}`);
+      
+      if (res.status === 200) {
+        console.log('res:', res.data);
+        // 타입 명시로 오류 해결
+        const data = res.data as {
+          imgUrls: string[];
+          placeId: number;
+          name: string;
+          address: string;
+          latitude: number;
+          longitude: number;
+          commentsCnt: number;
+          best?: number;
+          good?: number;
+          soso?: number;
+          bad?: number;
+        };
+        
+        console.log('장소 정보 조회 성공:', data);
+        
+        // Google Maps LatLng 객체 생성
+        const location = new google.maps.LatLng(pin.latitude, pin.longitude);
+        
+        // selectedPlace 상태 업데이트
+        setSelectedPlace({
+          name: data.name || '장소 정보',
+          address: data.address || '',
+          location: location,
+          photos: undefined, // API에서 사진 정보가 없으므로 undefined
+          imgUrls: data.imgUrls || []
+        });
+        
+        setSelectedPlaceId(pin.placeId);
+        
+        // 지도 중심 이동
+        if (map) {
+          map.setCenter({ lat: pin.latitude, lng: pin.longitude });
+          map.setZoom(16);
+        }
+        
+        // 사이드바 열기
+        setSidebarOpen(true);
+      }
+    } catch (e) {
+      console.error('장소 정보 조회 실패:', e);
+    } finally {
+      setIsPlaceLoading(false);
+    }
+  }, [map, selectedPlaceId]);
 
   if (!isLoaded) return <div>지도를 불러오는 중...</div>;
 
@@ -501,7 +567,7 @@ export default function MapPage() {
             />
           )}
 
-          {/* 4. mapPins로 받은 장소 마커 렌더링 (댓글 1개 이상) */}
+          {/* mapPins로 받은 장소 마커 렌더링 (클릭 이벤트 추가) */}
           {mapPins.map((pin) => (
             <OverlayView
               key={pin.placeId}
@@ -512,8 +578,11 @@ export default function MapPage() {
                 y: -height
               })}
             >
-              <MarkerContainer isNew={false}>
-                <NumberMarker />
+              <MarkerContainer 
+                isNew={false} 
+                onClick={() => handleMarkerClick(pin)}
+                isSelected={selectedPlaceId === pin.placeId}
+              >
                 <CommentBubble>
                   <ChatIcon fontSize='small'/>
                   {pin.commentsCnt}
@@ -531,6 +600,9 @@ export default function MapPage() {
         setPlaceName={setPlaceName}
         selectedPlace={selectedPlace}
         onAddPlace={() => selectedPlace && handleAddPlace(selectedPlace)}
+        selectedPlaceId={selectedPlaceId}
+        setSelectedPlaceId={setSelectedPlaceId}
+        isLoading={isPlaceLoading}
       />
       <ToggleButton sidebarOpen={sidebarOpen} onClick={() => setSidebarOpen(!sidebarOpen)}>
         {sidebarOpen ? (
@@ -621,12 +693,21 @@ const MapWrapper = styled(Box)`
 
 
   // 스타일 컴포넌트 수정
-  const MarkerContainer = styled.div<{ isNew: boolean }>`
+  const MarkerContainer = styled.div<{ isNew: boolean; isSelected?: boolean }>`
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     animation: ${props => props.isNew ? 'bounce 0.5s ease' : 'none'};
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    
+    /* 선택된 마커 강조 효과 */
+    transform: ${props => props.isSelected ? 'scale(1.1)' : 'scale(1)'};
+    
+    &:hover {
+      transform: scale(1.05);
+    }
 
     @keyframes bounce {
       0% {

@@ -96,13 +96,15 @@ const RightPanel = ({
         try {
             // 1. 여행 일정 생성 요청
             const { data: createTravelResponse } = await api.post<CreateTravelResponse>('/v1/travel', {
-                title: plan.region,
+                area: plan.region,
+                title: "",
                 thumbnail: null,
                 startDate: plan.startDate.toISOString().split('T')[0],
                 endDate: plan.endDate.toISOString().split('T')[0],
             });
 
             const travelId = createTravelResponse.data;
+            console.log("travelId", plan.region);
 
             // 2. 날짜별로 정렬된 코스 데이터 생성
             const courses: TravelCourse[] = dayPlans

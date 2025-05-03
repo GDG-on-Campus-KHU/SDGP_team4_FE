@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Box, Typography, TextField, Button } from '@mui/material';
 import styled from '@emotion/styled';
 import { Editor } from '@toast-ui/react-editor';
@@ -29,6 +29,7 @@ interface TravelJournalProps {
     startDate: string;
     endDate: string;
     travelId: string;
+    area: string;
   };
   days: Day[];
 }
@@ -36,22 +37,111 @@ interface TravelJournalProps {
 export default function TravelJournal({ onClose, travelInfo, days }: TravelJournalProps) {
   const [title, setTitle] = useState('');
   const editorRef = useRef<Editor>(null);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+
+  // 이미지 업로드 핸들러
+  const handleImageUpload = async (file: File, callback: (url: string, altText: string) => void) => {
+    try {
+      const formData = new FormData();
+      formData.append('images', file);
+      
+      const response = await api.post('/v1/bucket/image', formData);
+    
+      console.log('이미지 업로드 응답:', response.data);
+      
+      // 타입 안전성을 위한 응답 구조 확인
+      const responseData = response.data as { message?: string; data?: { imageUrl?: string } };
+      
+      if (response.status === 200 && responseData.data && responseData.data.imageUrl) {
+        const imageUrl = responseData.data.imageUrl;
+        
+        // 업로드된 이미지 URL 배열에 추가
+        setUploadedImages(prev => [...prev, imageUrl]);
+        
+        // 에디터에 이미지 삽입
+        callback(imageUrl, file.name);
+      } else {
+        console.error('이미지 업로드 응답 형식 오류:', response);
+        alert('이미지 업로드에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('이미지 업로드 오류:', error);
+      alert('이미지 업로드 중 오류가 발생했습니다.');
+    }
+  };
 
   const handleSave = async () => {
-    console.log("dfdf", travelInfo.travelId);
+    console.log("travelId:", travelInfo.travelId);
     const editorInstance = editorRef.current?.getInstance();
     const html = editorInstance?.getHTML();
+    
+    // 제목 유효성 검사
+    if (!title.trim()) {
+      alert('제목을 입력해주세요.');
+      return;
+    }
+    
     try {
-      const res = await api.post(`/v1/travel/${travelInfo.travelId}/post`, {
+      // 게시글 내용은 별도의 API로 저장
+      const postRes = await api.post(`/v1/travel/${travelInfo.travelId}/post`, {
         title,
         description: html,
       });
-      console.log("res:", res);
+      
+      // 여행 정보 업데이트를 위한 데이터 구성
+      // courseUpdateDto: days 배열의 장소 정보를 API 형식에 맞게 변환
+      const courseUpdateDto = [];
+      for (const day of days) {
+        for (const place of day.places) {
+          courseUpdateDto.push({
+            name: place.name,
+            address: place.address,
+            description: place.description || "",
+            courseDate: day.date,
+            moveTime: 0 // 기본값 설정
+          });
+        }
+      }
+      
+      // 첫 번째 업로드된 이미지를 썸네일로 사용
+      const thumbnailUrl = uploadedImages.length > 0 ? uploadedImages[0] : "";
+      console.log("사용할 썸네일 URL:", thumbnailUrl);
+      console.log("업로드된 이미지들:", uploadedImages);
+      
+      // 여행 정보 업데이트 요청 데이터
+      const updateData = {
+        travelUpdateDto: {
+          title: title,
+          area: travelInfo.area,
+          thumbnail: uploadedImages.length > 0 ? String(uploadedImages[0]) : "", // 명시적으로 문자열로 변환
+          startDate: travelInfo.startDate,
+          endDate: travelInfo.endDate
+        },
+        courseUpdateDto: courseUpdateDto
+      };
+      
+      // 요청 데이터 로깅
+      console.log("여행 정보 업데이트 요청 데이터:", JSON.stringify(updateData));
+      
+      // 여행 정보 업데이트 API 호출
+      const updateRes = await api.put(`/v1/travel/${travelInfo.travelId}`, updateData);
+      
+      // 응답 로깅
+      console.log("게시글 저장 응답:", postRes);
+      console.log("여행 정보 업데이트 응답:", updateRes);
+      
       alert('게시글로 전환 성공!');
+      onClose(); // 성공 후 닫기
     } catch (e: any) {
+      console.error('게시글 전환 오류:', e);
+      console.error('오류 응답 데이터:', e.response?.data);
       alert('게시글 전환 실패: ' + (e.response?.data?.message || e.message));
     }
   };
+
+  useEffect(() => {
+    console.log("travelInfo", travelInfo);
+  }, [travelInfo]);
 
   return (
     <Container>
@@ -106,7 +196,7 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <LocationOnIcon color="secondary" sx={{ fontSize: '24px', marginLeft: '-3px' }} />
             <Typography fontSize={14}>
-              {travelInfo.title}
+              {travelInfo.area}
             </Typography>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -129,6 +219,9 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
           hideModeSwitch={true}
           plugins={[colorSyntax]}
           language="ko-KR"
+          hooks={{
+            addImageBlobHook: handleImageUpload
+          }}
         />
       </EditorContainer>
       <Box mt={6}>
