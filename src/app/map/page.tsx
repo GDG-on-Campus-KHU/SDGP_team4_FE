@@ -59,11 +59,14 @@ export default function MapPage() {
   const [newPlaceId, setNewPlaceId] = useState<string | null>(null);
 
   // 1. mapPins 상태 추가
-  const [mapPins, setMapPins] = useState<{ placeId: number; latitude: number; longitude: number; commentsCnt: number }[]>([]);
+  const [mapPins, setMapPins] = useState<{ placeId: number; latitude: number; longitude: number; commentsCnt: number, bestCount: number, goodCount: number, sosoCount: number, badCount: number }[]>([]);
 
   // 선택된 장소의 placeId 저장 (API 요청용)
   const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
   const [isPlaceLoading, setIsPlaceLoading] = useState(false);
+
+  // 호버된 마커 관리
+  const [hoverPlaceId, setHoverPlaceId] = useState<number | null>(null);
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: 'AIzaSyDx01yI23584jz6SnjWsltrVrl0vkQve6U',
@@ -582,8 +585,30 @@ export default function MapPage() {
                 isNew={false} 
                 onClick={() => handleMarkerClick(pin)}
                 isSelected={selectedPlaceId === pin.placeId}
+                onMouseEnter={() => setHoverPlaceId(pin.placeId)}
+                onMouseLeave={() => setHoverPlaceId(null)}
               >
-                <CommentBubble>
+                {hoverPlaceId === pin.placeId && (
+                  <FeedbackTooltip>
+                    <FeedbackItem>
+                      <img src="/icons/emotion/best.svg" alt="최고예요" width={16} height={16} />
+                      <span>{pin.bestCount || 0}</span>
+                    </FeedbackItem>
+                    <FeedbackItem>
+                      <img src="/icons/emotion/good.svg" alt="좋아요" width={16} height={16} />
+                      <span>{pin.goodCount || 0}</span>
+                    </FeedbackItem>
+                    <FeedbackItem>
+                      <img src="/icons/emotion/soso.svg" alt="그저 그래요" width={16} height={16} />
+                      <span>{pin.sosoCount || 0}</span>
+                    </FeedbackItem>
+                    <FeedbackItem>
+                      <img src="/icons/emotion/bad.svg" alt="별로예요" width={16} height={16} />
+                      <span>{pin.badCount || 0}</span>
+                    </FeedbackItem>
+                  </FeedbackTooltip>
+                )}
+                <CommentBubble isSelected={selectedPlaceId === pin.placeId}>
                   <ChatIcon fontSize='small'/>
                   {pin.commentsCnt}
                 </CommentBubble>
@@ -745,8 +770,8 @@ const MapWrapper = styled(Box)`
     z-index: 2;
   `;
 
-  const CommentBubble = styled.div`
-    background: white;
+  const CommentBubble = styled.div<{ isSelected?: boolean }>`
+    background: ${props => props.isSelected ? '#FEF9D9' : 'white'};
     border: 1px solid #C1C1C1;
     border-radius: 10px;
     padding: 6px 10px;
@@ -756,6 +781,32 @@ const MapWrapper = styled(Box)`
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin-top: 12px;
     font-size: 14px;
+    transition: background-color 0.2s ease;
+  `;
+
+  // 피드백 툴팁 스타일 수정
+  const FeedbackTooltip = styled.div`
+    position: absolute;
+    top: -35px; /* 마커 위에 표시 */
+    background: #FEF9D9;
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    min-width: 120px;
+    z-index: 3;
+  `;
+
+  const FeedbackItem = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    
+    span {
+      color: #666;
+    }
   `;
 
 

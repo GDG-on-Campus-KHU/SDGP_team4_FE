@@ -26,6 +26,15 @@ interface SidebarProps {
   isLoading?: boolean;
 }
 
+// 피드백 응답 타입 정의
+interface FeedbackResponse {
+  bestCount: number;
+  goodCount: number;
+  sosoCount: number;
+  badCount: number;
+  myFeedback: string | null;
+}
+
 const Sidebar = ({
   open,
   onLoad,
@@ -42,7 +51,8 @@ const Sidebar = ({
   const [isPlaceRegistered, setIsPlaceRegistered] = useState(false);
   const [planId, setPlanId] = useState<number | null>(null);
   const [emotions, setEmotions] = useState({ best: 0, good: 0, soso: 0, bad: 0 });
-  const [comments, setComments] = useState<{ nickname: string; date: string; text: string }[]>([]);
+  const [myFeedback, setMyFeedback] = useState<string | null>(null);
+  const [comments, setComments] = useState<{ nickname: string; date: string; text: string; local: boolean }[]>([]);
   const [commentInput, setCommentInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [placeInfo, setPlaceInfo] = useState<{ 
@@ -58,14 +68,25 @@ const Sidebar = ({
   useEffect(() => {
     // 마커에서 선택된 장소가 있으면 해당 ID를 planId로 설정
     if (selectedPlaceId) {
+      console.log('selectedPlaceId:', selectedPlaceId);
       setPlanId(selectedPlaceId);
       setIsPlaceRegistered(true);
-
-      // // 감정 상태 초기화
-      // setEmotions({ best: 0, good: 0, soso: 0, bad: 0 });
-      // setComments([]);
+      setEmotions({ best: 0, good: 0, soso: 0, bad: 0 });
+      setComments([]);
     }
   }, [selectedPlaceId]);
+
+  useEffect(() => {
+    console.log("selectedPlace:", selectedPlace);
+    // 장소가 변경되면 등록 여부와 planId를 초기화
+    if (selectedPlace) {
+      setIsPlaceRegistered(false);
+      setPlanId(null);
+      setEmotions({ best: 0, good: 0, soso: 0, bad: 0 });
+      setComments([]);
+      setPlaceInfo(null);
+    }
+  }, [selectedPlace]); // 장소 이름이나 주소가 변경될 때만 실행
 
   // 장소 등록 및 planId 반환
   const registerPlaceIfNeeded = async (afterRegister?: (newPlanId: number) => Promise<void>) => {
@@ -151,22 +172,87 @@ const Sidebar = ({
     }
   };
 
+  // 장소 댓글 목록을 가져오는 함수 추가
+  const fetchComments = async (id: number) => {
+    if (!id) return;
+    
+    try {
+      const res = await api.get(`/v1/places/${id}/comments`);
+      console.log('댓글 목록 응답:', res.data);
+      
+      if (res.status === 200 && Array.isArray(res.data)) {
+        // 서버 응답을 UI용 댓글 형식으로 변환
+        const commentsData = res.data.map((comment: any) => ({
+          nickname: comment.nickname || '익명',
+          date: comment.createdAt || new Date().toISOString(),
+          text: comment.comment || '',
+          local: comment.local || false
+        }));
+        
+        setComments(commentsData);
+      } else {
+        setComments([]);
+      }
+    } catch (e) {
+      console.error('댓글 목록 가져오기 오류:', e);
+      setComments([]);
+    }
+  };
+
+  const fetchFeedbacks = async (id: number) => {
+    if (!id) return;
+    
+    try {
+      const res = await api.get(`/v1/places/${id}/feedbacks`);
+      console.log('피드백 정보 응답:', res.data);
+      
+      if (res.status === 200) {
+        const data = res.data as FeedbackResponse;
+        
+        // 피드백 카운트 정보 설정
+        setEmotions({
+          best: data.bestCount || 0,
+          good: data.goodCount || 0,
+          soso: data.sosoCount || 0,
+          bad: data.badCount || 0
+        });
+        
+        // 내가 남긴 피드백 정보 설정
+        setMyFeedback(data.myFeedback ? data.myFeedback.toLowerCase() : null);
+        
+        console.log('피드백 정보 업데이트:', {
+          emotions: {
+            best: data.bestCount || 0,
+            good: data.goodCount || 0,
+            soso: data.sosoCount || 0,
+            bad: data.badCount || 0
+          },
+          myFeedback: data.myFeedback ? data.myFeedback.toLowerCase() : null
+        });
+      }
+    } catch (e) {
+      console.error('피드백 정보 가져오기 오류:', e);
+    }
+  };
+
+  // selectedPlaceId가 변경될 때 댓글과 피드백 목록 가져오기
+  useEffect(() => {
+    if (selectedPlaceId) {
+      fetchComments(selectedPlaceId);
+      fetchFeedbacks(selectedPlaceId);
+    }
+  }, [selectedPlaceId]);
+
   const actuallyAddComment = async (id: number) => {
     try {
-      const memberId = localStorage.getItem('nickname') || '';
       const region = localStorage.getItem('region') || '';
       const address = selectedPlace?.address || '';
       const isLocal = region && address.includes(region);
-
-      console.log('댓글 등록 시작:', {
-        placeId: id,
-        isLocal,
-        comment: commentInput
-      });
+      console.log('isLocal:', isLocal);
 
       const res = await api.post('/v1/comments', {
         placeId: id,
-        isLocal,
+        islocal: isLocal,
         comment: commentInput,
       });
 
@@ -174,12 +260,8 @@ const Sidebar = ({
       if (res.status === 200) {
         console.log('댓글 등록 성공:', res.data);
 
-        // 댓글 등록 후 UI 업데이트
-        setComments(prev => [...prev, {
-          nickname: memberId,
-          date: new Date().toISOString(),
-          text: commentInput
-        }]);
+        // 댓글 등록 후 서버에서 최신 댓글 목록 다시 가져오기
+        await fetchComments(id);
 
         // 장소 정보 업데이트 (댓글 수 증가)
         if (placeInfo) {
@@ -208,19 +290,20 @@ const Sidebar = ({
 
     setLoading(true);
     try {
-      // 장소 등록이 필요한지 확인
-      const needRegister = !isPlaceRegistered || !planId || needsRegister();
+      // selectedPlaceId가 있으면 이미 등록된 장소로 판단
+      const needRegister = !selectedPlaceId;
+      console.log('장소 등록 필요 여부:', { needRegister, selectedPlaceId, isPlaceRegistered, planId });
 
       if (needRegister) {
         console.log('장소 등록이 필요합니다');
-        // 콜백 방식으로 변경하여 실행 순서 보장
         await registerPlaceIfNeeded(async (newPlanId) => {
           console.log('장소 등록 후 댓글 등록 시작, planId:', newPlanId);
           await actuallyAddComment(newPlanId);
         });
-      } else if (planId) {
-        console.log('장소가 이미 등록되어 있습니다, planId:', planId);
-        await actuallyAddComment(planId);
+      } else if (planId || selectedPlaceId) {
+        const id = selectedPlaceId || planId;
+        console.log('장소가 이미 등록되어 있습니다, id:', id);
+        await actuallyAddComment(id!);
       }
     } catch (error) {
       console.error('댓글 등록 프로세스 오류:', error);
@@ -239,23 +322,18 @@ const Sidebar = ({
         feedbackType
       });
       
-      setEmotions(prev => ({ ...prev, [type]: prev[type] + 1 }));
-      
-      // 장소 정보 업데이트
-      if (placeInfo) {
-        setPlaceInfo({
-          ...placeInfo,
-          [type]: placeInfo[type] + 1
-        });
-      }
-      
       // API 요청
-      const res = await api.post(`/v1/places/${id}/feedbacks?feedbackType=${feedbackType}`);
-      //console.log("res:", res);
+      await api.post(`/v1/places/${id}/feedbacks?feedbackType=${feedbackType}`);
+      console.log('감정 등록 API 요청 완료');
       
       return true;
     } catch (e: any) {
-      //console.error('감정 등록 오류:', e);
+      console.error('감정 등록 오류:', e);
+      return false;
+    } finally {
+      // 성공/실패 여부와 관계없이 항상 최신 피드백 정보 가져오기
+      console.log('최신 피드백 정보 가져오기');
+      await fetchFeedbacks(id);
     }
   };
 
@@ -264,82 +342,81 @@ const Sidebar = ({
     
     setLoading(true);
     try {
-      console.log('감정 표현 요청 시작:', { type, planId, isPlaceRegistered });
+      // selectedPlaceId가 있으면 이미 등록된 장소로 판단
+      const needRegister = !selectedPlaceId;
+      const isAlreadySelected = myFeedback === type;
+      const hasDifferentFeedback = myFeedback !== null && myFeedback !== type;
       
-      // 장소가 등록되어 있는지 확인
-      if (isPlaceRegistered && planId) {
-        console.log('장소가 이미 등록되어 있습니다, planId:', planId);
-        await actuallyAddEmotion(planId, type);
-      } else {
+      console.log('감정 표현 요청 시작:', { 
+        type, 
+        selectedPlaceId, 
+        planId, 
+        needRegister,
+        isAlreadySelected, 
+        hasDifferentFeedback,
+        myFeedback 
+      });
+      
+      // 이미 선택된 피드백이면 삭제 요청
+      if (isAlreadySelected) {
+        console.log('이미 선택된 피드백 삭제 요청');
+        const id = selectedPlaceId || planId;
+        if (id) {
+          try {
+            await api.delete(`/v1/places/${id}/feedbacks`);
+            console.log('피드백 삭제 요청 완료');
+          } catch (error) {
+            console.error('피드백 삭제 오류:', error);
+          } finally {
+            // 삭제 후 최신 피드백 정보 가져오기
+            await fetchFeedbacks(id);
+          }
+        }
+      } 
+      // 다른 피드백이 이미 선택된 경우, 기존 피드백 삭제 후 새 피드백 등록
+      else if (hasDifferentFeedback) {
+        console.log('다른 피드백이 이미 선택됨. 기존 피드백 삭제 후 새 피드백 등록');
+        const id = selectedPlaceId || planId;
+        if (id) {
+          try {
+            await api.delete(`/v1/places/${id}/feedbacks`);
+            console.log('기존 피드백 삭제 완료');
+          } catch (error) {
+            console.error('기존 피드백 삭제 오류, 계속 진행:', error);
+          }
+          
+          try {
+            const feedbackType = type.toUpperCase();
+            await api.post(`/v1/places/${id}/feedbacks?feedbackType=${feedbackType}`);
+            console.log('새 피드백 등록 완료');
+          } catch (error) {
+            console.error('새 피드백 등록 오류:', error);
+          } finally {
+            await fetchFeedbacks(id);
+          }
+        }
+      }
+      // 새로운 피드백 등록
+      else if (needRegister) {
         console.log('장소 등록이 필요합니다');
-        // 콜백 방식으로 변경하여 실행 순서 보장
         await registerPlaceIfNeeded(async (newPlanId) => {
           console.log('장소 등록 후 감정 등록 시작, planId:', newPlanId);
           await actuallyAddEmotion(newPlanId, type);
         });
+      } else {
+        const id = selectedPlaceId || planId;
+        console.log('장소가 이미 등록되어 있습니다, id:', id);
+        if (id) await actuallyAddEmotion(id, type);
       }
     } catch (error) {
+      console.error('감정 등록 프로세스 오류:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    console.log("selectedPlace:", selectedPlace);
-    // 장소가 변경되면 등록 여부와 planId를 초기화
-    if (selectedPlace) {
-      setIsPlaceRegistered(false);
-      setPlanId(null);
-      setEmotions({ best: 0, good: 0, soso: 0, bad: 0 });
-      setComments([]);
-      setPlaceInfo(null);
-    }
-  }, [selectedPlace?.name, selectedPlace?.address]); // 장소 이름이나 주소가 변경될 때만 실행
-
-
-  // useEffect(() => {
-  //   console.log('planId:', planId);
-  //   if (planId) {
-  //     (async () => {
-  //       try {
-  //         const res = await api.get(`/v1/places/${planId}`);
-  //         const data = res.data as { 
-  //           commentsCnt?: number; 
-  //           best?: number; 
-  //           good?: number; 
-  //           soso?: number; 
-  //           bad?: number;
-  //           imgUrls?: string[];
-  //         };
-  //         setPlaceInfo({
-  //           commentsCnt: data.commentsCnt ?? 0,
-  //           best: data.best ?? 0,
-  //           good: data.good ?? 0,
-  //           soso: data.soso ?? 0,
-  //           bad: data.bad ?? 0,
-  //           imgUrls: data.imgUrls ?? [],
-  //         });
-  //         console.log('장소 상세 정보:', data);
-  //       } catch (e) {
-  //         setPlaceInfo(null);
-  //       }
-  //     })();
-  //   }
-  // }, [planId]);
-
   const needsRegister = () => {
-    // placeInfo가 없거나 planId가 없는 경우에만 등록 필요
     return !placeInfo || !planId;
-  };
-
-  // 이미지 URL 조각을 합치는 함수
-  const getCombinedImageUrl = () => {
-    if (placeInfo?.imgUrls && placeInfo.imgUrls.length > 0) {
-      console.log("placeInfo.imgUrls:", placeInfo.imgUrls.join(''));
-
-      return placeInfo.imgUrls.join('');
-    }
-    return null;
   };
 
   return (
@@ -356,7 +433,6 @@ const Sidebar = ({
             {isLoading || loading ? (
               <LoadingContainer>
                 <div className="loading-spinner"></div>
-                <div>장소 정보를 불러오는 중...</div>
               </LoadingContainer>
             ) : (
               <>
@@ -381,22 +457,38 @@ const Sidebar = ({
                   />
                 ) : null}
                 <EmotionContainer>
-                  <EmotionButton disabled={loading} onClick={() => handleEmotion('best')}>
+                  <EmotionButton 
+                    disabled={loading} 
+                    onClick={() => handleEmotion('best')}
+                    isSelected={myFeedback === 'best'}
+                  >
                     <img src="/icons/emotion/best.svg" alt="최고예요" />
                     <span className="emotion-text">최고예요</span>
                     <span className="emotion-count">{emotions.best}</span>
                   </EmotionButton>
-                  <EmotionButton disabled={loading} onClick={() => handleEmotion('good')}>
+                  <EmotionButton 
+                    disabled={loading} 
+                    onClick={() => handleEmotion('good')}
+                    isSelected={myFeedback === 'good'}
+                  >
                     <img src="/icons/emotion/good.svg" alt="좋아요" />
                     <span className="emotion-text">좋아요</span>
                     <span className="emotion-count">{emotions.good}</span>
                   </EmotionButton>
-                  <EmotionButton disabled={loading} onClick={() => handleEmotion('soso')}>
+                  <EmotionButton 
+                    disabled={loading} 
+                    onClick={() => handleEmotion('soso')}
+                    isSelected={myFeedback === 'soso'}
+                  >
                     <img src="/icons/emotion/soso.svg" alt="그저 그래요" />
                     <span className="emotion-text">그저 그래요</span>
                     <span className="emotion-count">{emotions.soso}</span>
                   </EmotionButton>
-                  <EmotionButton disabled={loading} onClick={() => handleEmotion('bad')}>
+                  <EmotionButton 
+                    disabled={loading} 
+                    onClick={() => handleEmotion('bad')}
+                    isSelected={myFeedback === 'bad'}
+                  >
                     <img src="/icons/emotion/bad.svg" alt="별로예요" />
                     <span className="emotion-text">별로예요</span>
                     <span className="emotion-count">{emotions.bad}</span>
@@ -522,7 +614,7 @@ const EmotionContainer = styled.div`
   padding: 10px 25px;
 `;
 
-const EmotionButton = styled.div<{ disabled?: boolean }>`
+const EmotionButton = styled.div<{ disabled?: boolean, isSelected?: boolean }>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -530,6 +622,9 @@ const EmotionButton = styled.div<{ disabled?: boolean }>`
   cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
   opacity: ${props => props.disabled ? 0.5 : 1};
   pointer-events: ${props => props.disabled ? 'none' : 'auto'};
+  border-radius: 4px;
+  padding: 5px;
+  background-color: ${props => props.isSelected ? '#EEEEEE' : 'transparent'};
   .emotion-text {
     font-size: 10px;
     color: #000000;

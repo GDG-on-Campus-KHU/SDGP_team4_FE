@@ -1,13 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from '@emotion/styled';
 import ChatIcon from '@mui/icons-material/Chat';
 
 interface CommentSectionProps {
-    comments: { nickname: string; date: string; text: string }[];
+    comments: { nickname: string; date: string; text: string; local: boolean }[];
     // 필요한 props 추가 가능
 }
 
+type TabType = 'all' | 'traveler' | 'local';
+
 const CommentSection = ({ comments }: CommentSectionProps) => {
+    const [activeTab, setActiveTab] = useState<TabType>('all');
+    
+    // 현재 탭에 따라 댓글 필터링
+    const filteredComments = comments.filter(comment => {
+        if (activeTab === 'all') return true;
+        if (activeTab === 'traveler') return !comment.local;
+        if (activeTab === 'local') return comment.local;
+        return true;
+    });
+    
     return (
         <CommentContainer>
             <CommentHeader>
@@ -17,9 +29,24 @@ const CommentSection = ({ comments }: CommentSectionProps) => {
                 </CommentCount>
                 <TabContainer>
                     <CommentTabs>
-                        <CommentTab active={true}>전체</CommentTab>
-                        <CommentTab active={false}>여행객</CommentTab>
-                        <CommentTab active={false}>현지인</CommentTab>
+                        <CommentTab 
+                            active={activeTab === 'all'} 
+                            onClick={() => setActiveTab('all')}
+                        >
+                            전체
+                        </CommentTab>
+                        <CommentTab 
+                            active={activeTab === 'traveler'} 
+                            onClick={() => setActiveTab('traveler')}
+                        >
+                            여행객
+                        </CommentTab>
+                        <CommentTab 
+                            active={activeTab === 'local'} 
+                            onClick={() => setActiveTab('local')}
+                        >
+                            현지인
+                        </CommentTab>
                     </CommentTabs>
                     <AiSummaryContainer>
                         <img src="/icons/robot.svg" alt="AI 후기요약" />
@@ -28,18 +55,26 @@ const CommentSection = ({ comments }: CommentSectionProps) => {
                 </TabContainer>
             </CommentHeader>
             <CommentList>
-                {comments.map((comment, i) => (
-                    <CommentItem key={i}>
-                        <CommentAvatar />
-                        <CommentContent>
-                            <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between' }}>
-                                <CommentAuthor>{comment.nickname}</CommentAuthor>
-                                <CommentDate>{comment.date}</CommentDate>
-                            </div>
-                            <CommentText>{comment.text}</CommentText>
-                        </CommentContent>
-                    </CommentItem>
-                ))}
+                {filteredComments.length > 0 ? (
+                    filteredComments.map((comment, i) => (
+                        <CommentItem key={i}>
+                            <CommentAvatar />
+                            <CommentContent>
+                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                    <CommentAuthor>{comment.nickname}</CommentAuthor>
+                                    {comment.local && <CommentDate>현지인</CommentDate>}
+                                </div>
+                                <CommentText>{comment.text}</CommentText>
+                            </CommentContent>
+                        </CommentItem>
+                    ))
+                ) : (
+                    <EmptyCommentsMessage>
+                        {activeTab === 'traveler' ? '여행객 댓글이 없습니다.' : 
+                         activeTab === 'local' ? '현지인 댓글이 없습니다.' : 
+                         '댓글이 없습니다.'}
+                    </EmptyCommentsMessage>
+                )}
             </CommentList>
         </CommentContainer>
     );
@@ -120,7 +155,8 @@ const CommentItem = styled.div`
 `;
 
 const CommentAvatar = styled.div`
-  width: 32px;
+  display: flex;
+  width: 38px;
   height: 32px;
   border-radius: 50%;
   background-color: #EEEEEE;
@@ -129,8 +165,8 @@ const CommentAvatar = styled.div`
 const CommentContent = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
   width: 100%;
+  gap: 4px;
 `;
 
 const CommentText = styled.p`
@@ -146,8 +182,24 @@ const CommentAuthor = styled.span`
 `;
 
 const CommentDate = styled.span`
+  display: flex;
+  align-items: center;
+  text-align: center;
   font-size: 10px;
+  color: #B4643A;
+  background-color: #FFEAA9;
+  padding: 3px 6px;
+  border-radius: 10px;
+  font-size: 8px;
+`;
+
+const EmptyCommentsMessage = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
   color: #9A9A9A;
+  font-size: 12px;
 `;
 
 export default CommentSection;
