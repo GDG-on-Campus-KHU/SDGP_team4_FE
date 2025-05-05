@@ -9,7 +9,7 @@ import AddIcon from '@mui/icons-material/Add';
 import TravelPlanModal from '@/components/map/TravelPlanModal';
 import Sidebar from '@/components/map/Sidebar';
 import RightPanel from '@/components/map/RightPanel';
-import { TransportMode, PlaceItem, DayPlan, Plan } from '@/type/plan';
+import { TransportMode, PlaceItem as BasePlaceItem, DayPlan, Plan } from '@/type/plan';
 import ChatIcon from '@mui/icons-material/Chat';
 import api from '@/utils/axios';
 
@@ -29,6 +29,11 @@ interface SelectedPlace {
   location?: google.maps.LatLng;
   photos?: google.maps.places.PlacePhoto[];
   imgUrls?: string[];
+}
+
+// PlaceItem 타입 확장 (기존 PlaceItem을 확장)
+interface PlaceItem extends BasePlaceItem {
+  placeId?: number; // 서버의 placeId 추가
 }
 
 export default function MapPage() {
@@ -83,6 +88,9 @@ export default function MapPage() {
   const onPlaceChanged = useCallback(() => {
     if (searchBox && map) {
       try {
+        // 검색 시 selectedPlaceId 초기화
+        setSelectedPlaceId(null);
+        
         const place = searchBox.getPlace();
         const searchText = placeName;
         
@@ -246,14 +254,40 @@ export default function MapPage() {
     const currentDateStr = currentDate.toDateString();
     const newId = generateUniqueId();  // ID 미리 생성
 
+    // 선택된 마커의 위치 정보 사용 (selectedPlaceId가 있는 경우)
+    let lat, lng;
+    let serverPlaceId = undefined;  // 서버의 placeId 초기화
+    
+    // 검색 결과인지 지도 선택인지 구분
+    const isFromSearch = !selectedPlaceId && place.location;
+    
+    if (selectedPlaceId && !isFromSearch) {
+      // 맵 핀에서 선택된 장소의 좌표 찾기
+      const pin = mapPins.find(p => p.placeId === selectedPlaceId);
+      if (pin) {
+        lat = pin.latitude;
+        lng = pin.longitude;
+        serverPlaceId = selectedPlaceId;  // 지도 마커에서 선택한 경우에만 placeId 설정
+      } else {
+        // 핀을 찾을 수 없으면, 검색 결과처럼 처리
+        lat = place.location.lat();
+        lng = place.location.lng();
+      }
+    } else {
+      // 일반 검색으로 찾은 장소는 원래대로 처리 (placeId 없음)
+      lat = place.location.lat();
+      lng = place.location.lng();
+    }
+
     const newPlace: PlaceItem = {
       id: newId,
       name: place.name,
       address: place.address,
       location: {
-        lat: place.location.lat(),
-        lng: place.location.lng()
+        lat: lat,
+        lng: lng
       },
+      placeId: serverPlaceId, // 지도 마커에서 선택한 경우에만 placeId 설정
       travelDuration: 0,
       travelDurationText: ''
     };
@@ -296,7 +330,7 @@ export default function MapPage() {
     setNewPlaceId(newId);
     // 애니메이션 종료 후 ID 초기화
     setTimeout(() => setNewPlaceId(null), 500);
-  }, [currentDate, dayPlans, calculateTravelTime]);
+  }, [currentDate, dayPlans, calculateTravelTime, selectedPlaceId, mapPins]);
 
   const handleDeletePlace = useCallback(async (dateStr: string, placeId: string) => {
     // 깊은 복사를 하되 Date 객체 유지
@@ -354,6 +388,7 @@ export default function MapPage() {
       plan.date.toDateString() === currentDate.toDateString()
     );
 
+    // 모든 추가된 장소 반환 (필터링 제거)
     return currentPlan?.places || [];
   }, [currentDate, dayPlans]);
 
@@ -523,8 +558,8 @@ export default function MapPage() {
           onLoad={onMapLoad}
           onIdle={handleMapIdle}
         >
-          {/* 선택된 날짜의 장소들 표시 */}
-          {getCurrentDayMarkers().map((place, index) => (
+          {/* 선택된 날짜의 장소들 표시 - 지도에 등록된 pin이 아닌 검색으로 추가된 장소들 */}
+          {getCurrentDayMarkers().filter(place => !(place as any).placeId).map((place, index) => (
             <React.Fragment key={place.id}>
               <OverlayView
                 position={{
@@ -539,7 +574,8 @@ export default function MapPage() {
               >
                 <MarkerContainer isNew={place.id === newPlaceId}>
                   <NumberMarker>
-                    {index + 1}
+                    {/* 추가된 순서 계산 */}
+                    {getCurrentDayMarkers().findIndex(p => p.id === place.id) + 1}
                   </NumberMarker>
                   <CommentBubble>
                     <ChatIcon fontSize='small'/>
@@ -550,7 +586,7 @@ export default function MapPage() {
             </React.Fragment>
           ))}
 
-          {/* 순서 동그라미를 잇는 선 */}
+          {/* 순서 동그라미를 잇는 선 - 모든 추가된 장소 연결 */}
           <Polyline
             path={getPathCoordinates()}
             options={{
@@ -571,50 +607,65 @@ export default function MapPage() {
           )}
 
           {/* mapPins로 받은 장소 마커 렌더링 (클릭 이벤트 추가) */}
-          {mapPins.map((pin) => (
-            <OverlayView
-              key={pin.placeId}
-              position={{ lat: pin.latitude, lng: pin.longitude }}
-              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-              getPixelPositionOffset={(width, height) => ({
-                x: -(width / 2),
-                y: -height
-              })}
-            >
-              <MarkerContainer 
-                isNew={false} 
-                onClick={() => handleMarkerClick(pin)}
-                isSelected={selectedPlaceId === pin.placeId}
-                onMouseEnter={() => setHoverPlaceId(pin.placeId)}
-                onMouseLeave={() => setHoverPlaceId(null)}
+          {mapPins.map((pin) => {
+            // 현재 일정에 이미 추가된 장소인지 확인
+            const addedPlaceIndex = getCurrentDayMarkers().findIndex(place => 
+              (place as any).placeId === pin.placeId
+            );
+            
+            const isAddedPlace = addedPlaceIndex !== -1;
+            const orderNumber = isAddedPlace ? addedPlaceIndex + 1 : null;
+
+            return (
+              <OverlayView
+                key={pin.placeId}
+                position={{ lat: pin.latitude, lng: pin.longitude }}
+                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                getPixelPositionOffset={(width, height) => ({
+                  x: -(width / 2),
+                  y: -height
+                })}
               >
-                {hoverPlaceId === pin.placeId && (
-                  <FeedbackTooltip>
-                    <FeedbackItem>
-                      <img src="/icons/emotion/best.svg" alt="최고예요" width={16} height={16} />
-                      <span>{pin.bestCount || 0}</span>
-                    </FeedbackItem>
-                    <FeedbackItem>
-                      <img src="/icons/emotion/good.svg" alt="좋아요" width={16} height={16} />
-                      <span>{pin.goodCount || 0}</span>
-                    </FeedbackItem>
-                    <FeedbackItem>
-                      <img src="/icons/emotion/soso.svg" alt="그저 그래요" width={16} height={16} />
-                      <span>{pin.sosoCount || 0}</span>
-                    </FeedbackItem>
-                    <FeedbackItem>
-                      <img src="/icons/emotion/bad.svg" alt="별로예요" width={16} height={16} />
-                      <span>{pin.badCount || 0}</span>
-                    </FeedbackItem>
-                  </FeedbackTooltip>
-                )}
-                <CommentBubble isSelected={selectedPlaceId === pin.placeId}>
-                  <ChatIcon fontSize='small'/>
-                  {pin.commentsCnt}
-                </CommentBubble>
-              </MarkerContainer>
-            </OverlayView>
-          ))}
+                <MarkerContainer 
+                  isNew={false} 
+                  onClick={() => handleMarkerClick(pin)}
+                  isSelected={selectedPlaceId === pin.placeId}
+                  onMouseEnter={() => setHoverPlaceId(pin.placeId)}
+                  onMouseLeave={() => setHoverPlaceId(null)}
+                >
+                  {isAddedPlace && (
+                    <NumberMarker>
+                      {orderNumber}
+                    </NumberMarker>
+                  )}
+                  {hoverPlaceId === pin.placeId && (
+                    <FeedbackTooltip>
+                      <FeedbackItem>
+                        <img src="/icons/emotion/best.svg" alt="최고예요" width={16} height={16} />
+                        <span>{pin.bestCount || 0}</span>
+                      </FeedbackItem>
+                      <FeedbackItem>
+                        <img src="/icons/emotion/good.svg" alt="좋아요" width={16} height={16} />
+                        <span>{pin.goodCount || 0}</span>
+                      </FeedbackItem>
+                      <FeedbackItem>
+                        <img src="/icons/emotion/soso.svg" alt="그저 그래요" width={16} height={16} />
+                        <span>{pin.sosoCount || 0}</span>
+                      </FeedbackItem>
+                      <FeedbackItem>
+                        <img src="/icons/emotion/bad.svg" alt="별로예요" width={16} height={16} />
+                        <span>{pin.badCount || 0}</span>
+                      </FeedbackItem>
+                    </FeedbackTooltip>
+                  )}
+                  <CommentBubble isSelected={selectedPlaceId === pin.placeId}>
+                    <ChatIcon fontSize='small'/>
+                    {pin.commentsCnt}
+                  </CommentBubble>
+                </MarkerContainer>
+              </OverlayView>
+            );
+          })}
         </GoogleMap>
       </MapWrapper>
       <Sidebar
