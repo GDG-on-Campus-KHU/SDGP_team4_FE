@@ -13,7 +13,7 @@ import { TransportMode, PlaceItem as BasePlaceItem, DayPlan, Plan } from '@/type
 import ChatIcon from '@mui/icons-material/Chat';
 import api from '@/utils/axios';
 import { useAppSelector, useAppDispatch } from '@/redux/hooks';
-import { setEditingMode, resetTravelInfo } from '@/redux/slices/travelSlice';
+import { setEditingMode, resetTravelInfo, setSearchPlace } from '@/redux/slices/travelSlice';
 import CustomDialog from '@/components/common/CustomDialog';
 
 const containerStyle = {
@@ -89,6 +89,9 @@ export default function MapPage() {
   // mapPins 업데이트 후 검색을 처리했는지 추적하는 플래그
   const searchAfterMapUpdate = useRef(false);
 
+  // Places API 서비스를 위한 참조 추가
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
     libraries: ['places', 'geometry'],
@@ -113,28 +116,6 @@ export default function MapPage() {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
     return distance;
-  };
-
-  // 검색한 장소가 백엔드에 이미 등록되어 있는지 직접 확인하는 함수 수정
-  const checkIfPlaceExistsInBackend = async (lat: number, lng: number, address?: string): Promise<{ placeId: number } | null> => {
-    try {
-      // 1. 먼저 현재 로드된 맵핀에서 확인 (가장 빠름)
-      const localMatch = mapPins.find(pin => 
-        Math.abs(pin.latitude - lat) < 0.000001 && 
-        Math.abs(pin.longitude - lng) < 0.000001
-      );
-      
-      if (localMatch) {
-        console.log('로컬 맵핀에서 정확한 좌표 일치 발견:', localMatch.placeId);
-        return { placeId: localMatch.placeId };
-      }
-      
-      // 일치하는 장소를 찾지 못함
-      return null;
-    } catch (error) {
-      console.error('백엔드에서 장소 확인 중 오류:', error);
-      return null;
-    }
   };
 
   // 마커 클릭 핸들러 (먼저 정의)
@@ -278,6 +259,14 @@ export default function MapPage() {
         offset: '100%'
       }]
     }));
+    
+    // Places API 서비스 초기화
+    if (window.google && window.google.maps && window.google.maps.places) {
+      const placesDiv = document.createElement('div');
+      document.body.appendChild(placesDiv);
+      placesServiceRef.current = new window.google.maps.places.PlacesService(placesDiv);
+      console.log('Places 서비스 초기화 완료');
+    }
   }, []);
 
   const handleAddPlan = (region: string, startDate: Date, endDate: Date) => {
@@ -575,6 +564,145 @@ export default function MapPage() {
     setTransportMode(mode);
   }, [dayPlans, calculateTravelTime]);
 
+  // 맵핀 일치 여부 찾는 함수 추가
+  const findMatchingPin = useCallback((pins: Array<{placeId: number; latitude: number; longitude: number; commentsCnt: number}>, lat: number, lng: number) => {
+    console.log(`맵핀 검색 시작 - 좌표(${lat}, ${lng}), 맵핀 수: ${pins.length}`);
+    
+    // 위도/경도 차이 비교 (0.005도 = 약 550미터까지 확장)
+    const tolerance = 0.005;
+    
+    // 1. 모든 맵핀을 순회하며 위도/경도 차이 계산
+    const pinsWithDiff = pins.map(pin => {
+      const latDiff = Math.abs(pin.latitude - lat);
+      const lngDiff = Math.abs(pin.longitude - lng);
+      return { 
+        pin, 
+        latDiff, 
+        lngDiff, 
+        totalDiff: latDiff + lngDiff 
+      };
+    });
+    
+    // 2. 위도/경도 차이 합이 가장 작은 핀 3개 로깅
+    const sortedPins = [...pinsWithDiff].sort((a, b) => a.totalDiff - b.totalDiff);
+    console.log("가장 가까운 맵핀 후보들:");
+    sortedPins.slice(0, 3).forEach(item => {
+      console.log(`맵핀 ID: ${item.pin.placeId}, 위도차: ${item.latDiff.toFixed(6)}, 경도차: ${item.lngDiff.toFixed(6)}, 총차이: ${item.totalDiff.toFixed(6)}`);
+    });
+    
+    // 3. 일정 범위 내에 있는 맵핀 찾기
+    const matchingPin = pinsWithDiff.find(item => 
+      item.latDiff < tolerance && 
+      item.lngDiff < tolerance
+    );
+    
+    if (matchingPin) {
+      console.log(`일치하는 맵핀 발견! ID: ${matchingPin.pin.placeId}, 위도차: ${matchingPin.latDiff.toFixed(6)}, 경도차: ${matchingPin.lngDiff.toFixed(6)}`);
+      return matchingPin.pin;
+    }
+    
+    console.log(`허용 범위(${tolerance}) 내에 맵핀이 없습니다.`);
+    return null;
+  }, []);
+  
+  // 검색 결과를 처리하는 함수 수정
+  const processPlaceSearchResult = useCallback(async (name: string, address: string, lat: number, lng: number, isFromGeocoder?: boolean) => {
+    console.log('검색 결과 처리 시작:', name, `좌표(${lat}, ${lng})`);
+    
+    try {
+      // 최신 맵핀 정보로 재검색 수행 (주변 맵핀 요청)
+      const bounds = map?.getBounds();
+      if (map && bounds) {
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        
+        const minLat = sw.lat();
+        const maxLat = ne.lat();
+        const minLng = sw.lng();
+        const maxLng = ne.lng();
+        
+        console.log('최신 맵핀 정보 요청 중...');
+        const res = await api.get(`/v1/map/places/pin?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
+        const freshPins = res.data as Array<{placeId: number; latitude: number; longitude: number; commentsCnt: number; bestCount: number; goodCount: number; sosoCount: number; badCount: number}>;
+        console.log(`새로운 맵핀 정보 수신: ${freshPins.length}개`);
+        
+        // 최신 맵핀 정보로 매칭 확인
+        const matchingPin = findMatchingPin(freshPins, lat, lng);
+        
+        if (matchingPin) {
+          // 맵핀이 있으면 맵핀 정보 사용
+          console.log('맵핀 발견! 맵핀 정보 사용:', matchingPin.placeId);
+          await handleMarkerClick(matchingPin);
+          
+          // 이미 맵핀 처리를 했으므로 더 진행하지 않음
+          return;
+        }
+        
+        console.log('매칭되는 맵핀을 찾지 못함, Places API 사용 진행');
+      }
+    } catch (error) {
+      console.error('맵핀 재확인 중 오류:', error);
+    }
+    
+    // 맵핀이 없는 경우에만 Places API 사용
+    if (placesServiceRef.current) {
+      console.log('Places API 호출:', name);
+      placesServiceRef.current.textSearch({
+        query: name,
+        location: new window.google.maps.LatLng(lat, lng),
+        radius: 500
+      }, (results, status) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+          const place = results[0];
+          
+          if (place.photos && place.photos.length > 0) {
+            console.log('Places API에서 이미지를 찾음:', place.name);
+            setSelectedPlace({
+              name,
+              address,
+              location: new window.google.maps.LatLng(lat, lng),
+              photos: place.photos
+            });
+          } else {
+            setSelectedPlace({
+              name,
+              address,
+              location: new window.google.maps.LatLng(lat, lng)
+            });
+          }
+        } else {
+          console.warn('Places API 검색 실패:', status);
+          setSelectedPlace({
+            name,
+            address,
+            location: new window.google.maps.LatLng(lat, lng)
+          });
+        }
+        
+        // 항상 사이드바 열기
+        setSidebarOpen(true);
+      });
+    } else {
+      // Places API가 없으면 기본 처리
+      setSelectedPlace({
+        name,
+        address,
+        location: new window.google.maps.LatLng(lat, lng)
+      });
+      
+      // 항상 사이드바 열기
+      setSidebarOpen(true);
+    }
+    
+    // 검색어 필드 설정
+    if (!isFromGeocoder) {
+      setPlaceName(name);
+    }
+    
+    // 마커 위치 설정
+    setMarkerPosition({ lat, lng });
+  }, [map, findMatchingPin, handleMarkerClick]);
+
   // handleMapIdle 함수 수정 - 디버깅 로그 추가 및 좌표 비교 허용 오차 증가
   const handleMapIdle = useCallback(async () => {
     if (!map) return;
@@ -590,88 +718,41 @@ export default function MapPage() {
 
     try {
       const res = await api.get(`/v1/map/places/pin?minLat=${minLat}&maxLat=${maxLat}&minLng=${minLng}&maxLng=${maxLng}`);
-      const data = res.data;
-      console.log("mapPins 업데이트:", data);
-      if (Array.isArray(data)) {
-        //setMapPins(data.filter((pin: any) => pin.commentsCnt > 0));
-        setMapPins(data);       
-        // 보류 중인 검색 결과가 있으면 처리
-        if (pendingSearchResult && searchAfterMapUpdate.current) {
-          searchAfterMapUpdate.current = false;
-          const { lat, lng, name, address, photos, isFromGeocoder } = pendingSearchResult;
-          // 맵핀에서 일치하는 장소 찾기 - 허용 오차 증가 (약 20미터)
-          let matchingPin = null;
+      const data = res.data as Array<{placeId: number; latitude: number; longitude: number; commentsCnt: number; bestCount: number; goodCount: number; sosoCount: number; badCount: number}>;
+      console.log("맵핀 업데이트:", data.length ? `${data.length}개 수신` : "없음");
+      
+      // 맵핀 상태 업데이트
+      setMapPins(data);
+      
+      // 보류 중인 검색 결과가 있으면 처리
+      if (pendingSearchResult && searchAfterMapUpdate.current) {
+        searchAfterMapUpdate.current = false;
+        const { lat, lng, name, address, photos, isFromGeocoder } = pendingSearchResult;
+        
+        // 맵핀에서 일치하는 장소 찾기
+        const matchingPin = findMatchingPin(data, lat, lng);
+        
+        if (matchingPin) {
+          // 일치하는 맵핀이 있으면 해당 맵핀 정보 사용
+          console.log(`맵핀 찾음: ${matchingPin.placeId}`, matchingPin);
           
-          // 1. 먼저 정확한 좌표 일치 확인 - mapPins 대신 API 응답 데이터인 data 배열 사용
-          const exactMatch = data.find(pin => 
-            Math.abs(pin.latitude - lat) < 0.0001 && 
-            Math.abs(pin.longitude - lng) < 0.0001
-          );
-          
-          if (exactMatch) {
-            console.log(`정확한 좌표 일치 발견: ${exactMatch.placeId}`, {
-              pinLat: exactMatch.latitude, 
-              pinLng: exactMatch.longitude,
-              searchLat: lat,
-              searchLng: lng,
-              latDiff: Math.abs(exactMatch.latitude - lat),
-              lngDiff: Math.abs(exactMatch.longitude - lng)
-            });
-            matchingPin = exactMatch;
-          } else {
-            // 2. 거리 기반 검색 (50미터 이내) - mapPins 대신 data 배열 사용
-            let closestPin = null;
-            let minDistance = Number.MAX_VALUE;
-            
-            for (const pin of data) {
-              const distance = calculateDistance(lat, lng, pin.latitude, pin.longitude);
-              if (distance < minDistance) {
-                minDistance = distance;
-                closestPin = pin;
-              }
-            }
-            
-            if (closestPin && minDistance <= 50) {
-              console.log(`가까운 마커 발견 (${minDistance.toFixed(2)}m): ${closestPin.placeId}`, {
-                pinLat: closestPin.latitude, 
-                pinLng: closestPin.longitude,
-                searchLat: lat,
-                searchLng: lng,
-                distance: minDistance
-              });
-              matchingPin = closestPin;
-            } else if (closestPin) {
-              console.log(`가장 가까운 마커가 너무 멀리 있음 (${minDistance.toFixed(2)}m): ${closestPin.placeId}`);
-            }
+          // handleMarkerClick 호출
+          try {
+            setIsPlaceLoading(true);
+            await handleMarkerClick(matchingPin);
+          } catch (error) {
+            console.error('맵핀 클릭 처리 중 오류:', error);
+            // 오류 발생 시에만 일반 검색 결과 사용
+            await processPlaceSearchResult(name, address, lat, lng, isFromGeocoder);
           }
-          
-          if (matchingPin) {
-            // 일치하는 맵핀이 있으면 해당 맵핀 정보 사용
-            console.log(`지도 업데이트 후 일치하는 맵핀 발견: ${matchingPin.placeId}`);
-            handleMarkerClick(matchingPin);
-          } else {
-            // 일치하는 맵핀이 없으면 일반 검색 결과 사용
-            console.log('일치하는 맵핀이 없어 검색 결과 사용');
-            setSelectedPlace({
-              name,
-              address,
-              location: new google.maps.LatLng(lat, lng),
-              photos
-            });
-
-            if (!isFromGeocoder) {
-              setPlaceName(name);
-            }
-            
-            setMarkerPosition({ lat, lng });
-          }
-          
-          // 보류 중인 검색 결과 초기화
-          setPendingSearchResult(null);
+        } else {
+          // 일치하는 맵핀이 없으면 일반 검색 결과 사용
+          console.log('일치하는 맵핀 없음, 검색 결과 사용');
+          await processPlaceSearchResult(name, address, lat, lng, isFromGeocoder);
         }
-      } else {
-        setMapPins([]);
-        console.error(data);
+        
+        // 보류 중인 검색 결과 초기화
+        setPendingSearchResult(null);
       }
     } catch (e: any) {
       if (e.response) {
@@ -681,28 +762,17 @@ export default function MapPage() {
       }
       setMapPins([]);
       
-      // 오류가 발생해도 보류 중인 검색 결과가 있으면 일반 검색 결과로 처리
+      // 오류가 발생해도 보류 중인 검색 결과가 있으면 처리
       if (pendingSearchResult && searchAfterMapUpdate.current) {
         searchAfterMapUpdate.current = false;
         const { lat, lng, name, address, photos, isFromGeocoder } = pendingSearchResult;
         
-        // 일반 검색 결과 사용
-        setSelectedPlace({
-          name,
-          address,
-          location: new google.maps.LatLng(lat, lng),
-          photos
-        });
-
-        if (!isFromGeocoder) {
-          setPlaceName(name);
-        }
-        
-        setMarkerPosition({ lat, lng });
+        // API 오류 시 바로 검색 결과 처리
+        await processPlaceSearchResult(name, address, lat, lng, isFromGeocoder);
         setPendingSearchResult(null);
       }
     }
-  }, [map, pendingSearchResult, handleMarkerClick, calculateDistance]);
+  }, [map, pendingSearchResult, handleMarkerClick, processPlaceSearchResult, findMatchingPin]);
 
   // Redux 상태 및 디스패치 추가
   const dispatch = useAppDispatch();
@@ -915,6 +985,57 @@ export default function MapPage() {
     dispatch(resetTravelInfo());
     window.history.back();
   };
+
+  // 검색할 장소가 있을 때 자동으로 검색을 수행하는 useEffect 수정
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+    
+    // Redux에서 검색할 장소 정보가 있는지 확인
+    const { searchPlace } = travelInfo;
+    
+    if (searchPlace) {
+      setSidebarOpen(true);
+      setPlaceName(searchPlace.name);
+      
+      // 검색 키워드 설정 (주소 또는 이름)
+      const searchKeyword = searchPlace.address || searchPlace.name;
+      
+      // onPlaceChanged 함수와 동일한 방식으로 처리
+      const geocoder = new google.maps.Geocoder();
+      
+      geocoder.geocode(
+        { address: searchKeyword, region: 'KR' },
+        (results, status) => {
+          if (status === google.maps.GeocoderStatus.OK && results?.[0]) {
+            const location = results[0].geometry.location;
+            const address = results[0].formatted_address || searchPlace.address;
+            
+            const lat = location.lat();
+            const lng = location.lng();
+            
+            // 검색 결과를 보류 상태로 저장
+            setPendingSearchResult({
+              lat,
+              lng,
+              name: searchPlace.name,
+              address,
+              isFromGeocoder: true
+            });
+            
+            // 검색 후 맵 업데이트 플래그 설정
+            searchAfterMapUpdate.current = true;
+            
+            // 지도를 검색 위치로 이동 - 이동 후 handleMapIdle이 호출됨
+            map.setCenter(location);
+            map.setZoom(15);
+            
+            // 검색 완료 후 Redux 상태 초기화
+            dispatch(setSearchPlace(undefined));
+          }
+        }
+      );
+    }
+  }, [isLoaded, map, travelInfo.searchPlace, dispatch]);
 
   if (!isLoaded) return <div>지도를 불러오는 중...</div>;
 

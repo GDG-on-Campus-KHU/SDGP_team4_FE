@@ -22,6 +22,10 @@ interface TravelInfo {
   isEditing: boolean;
   viewOnly: boolean;
   thumbnail: string | null;
+  searchPlace?: {
+    name: string;
+    address: string;
+  };
 }
 
 const initialState: TravelInfo = {
@@ -33,7 +37,8 @@ const initialState: TravelInfo = {
   days: [],
   isEditing: false,
   viewOnly: false,
-  thumbnail: null
+  thumbnail: null,
+  searchPlace: undefined
 };
 
 const travelSlice = createSlice({
@@ -70,6 +75,14 @@ const travelSlice = createSlice({
     // 뷰 모드 설정
     setViewOnly: (state, action: PayloadAction<boolean>) => {
       state.viewOnly = action.payload;
+    },
+    
+    // 검색할 장소 설정
+    setSearchPlace: (state, action: PayloadAction<{
+      name: string;
+      address: string;
+    } | undefined>) => {
+      state.searchPlace = action.payload;
     },
     
     // 여행 정보 초기화
@@ -115,6 +128,7 @@ export const {
   setTravelInfo, 
   setEditingMode, 
   setViewOnly,
+  setSearchPlace,
   resetTravelInfo, 
   updatePlace, 
   removePlace 

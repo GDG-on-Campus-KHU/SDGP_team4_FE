@@ -8,7 +8,7 @@ import api from '@/utils/axios';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import TravelJournal from '@/components/my/TravelJournal';
 import { useAppDispatch } from '@/redux/hooks';
-import { setTravelInfo } from '@/redux/slices/travelSlice';
+import { setTravelInfo, setSearchPlace } from '@/redux/slices/travelSlice';
 
 // 인터페이스 정의
 interface TravelInfoDto {
@@ -232,6 +232,18 @@ export default function TripDetailPage() {
         router.push('/map');
     };
 
+    // 화살표 아이콘 클릭 핸들러 추가
+    const handlePlaceView = (name: string, address: string) => {
+        // 검색할 장소 정보 설정
+        dispatch(setSearchPlace({
+            name,
+            address
+        }));
+        
+        // 지도 페이지로 이동
+        router.push('/map');
+    };
+
     return (
         <Container>
             {isWritingJournal ? (
@@ -296,7 +308,7 @@ export default function TripDetailPage() {
                                                         <PlaceName>{place.name}</PlaceName>
                                                         <PlaceAddress>{place.address}</PlaceAddress>
                                                     </PlaceInfo>
-                                                    <ArrowIcon />
+                                                    <ArrowIcon onClick={() => handlePlaceView(place.name, place.address)} />
                                                     {!place.description && !editingMemo &&
                                                         <AddMemoButton onClick={() => handleAddMemo(place.id)}>
                                                             + 메모추가
