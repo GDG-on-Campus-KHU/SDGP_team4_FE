@@ -22,6 +22,7 @@ const TravelPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortType, setSortType] = useState<'latest' | 'popular' | null>(null);
+    
 
     // description에서 첫 번째 이미지 URL 추출하는 함수
     const extractImageUrl = (description: string) => {
