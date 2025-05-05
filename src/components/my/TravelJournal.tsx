@@ -9,6 +9,7 @@ import '@toast-ui/editor/dist/i18n/ko-kr';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import TravelPlanViewer from '@/components/common/TravelPlanViewer';
+import CustomDialog from '@/components/common/CustomDialog';
 import api from '@/utils/axios';
 
 interface Place {
@@ -38,6 +39,12 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
   const [title, setTitle] = useState('');
   const editorRef = useRef<Editor>(null);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  
+  // Dialog 상태 관리
+  const [openErrorDialog, setOpenErrorDialog] = useState(false);
+  const [openSuccessDialog, setOpenSuccessDialog] = useState(false);
+  const [openTitleDialog, setOpenTitleDialog] = useState(false);
+  const [dialogMessage, setDialogMessage] = useState('');
 
   // 이미지 업로드 핸들러
   const handleImageUpload = async (file: File, callback: (url: string, altText: string) => void) => {
@@ -62,11 +69,13 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
         callback(imageUrl, file.name);
       } else {
         console.error('이미지 업로드 응답 형식 오류:', response);
-        alert('이미지 업로드에 실패했습니다.');
+        setDialogMessage('이미지 업로드에 실패했습니다.');
+        setOpenErrorDialog(true);
       }
     } catch (error) {
       console.error('이미지 업로드 오류:', error);
-      alert('이미지 업로드 중 오류가 발생했습니다.');
+      setDialogMessage('이미지 업로드 중 오류가 발생했습니다.');
+      setOpenErrorDialog(true);
     }
   };
 
@@ -77,7 +86,7 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
     
     // 제목 유효성 검사
     if (!title.trim()) {
-      alert('제목을 입력해주세요.');
+      setOpenTitleDialog(true);
       return;
     }
     
@@ -135,13 +144,19 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
       console.log("게시글 저장 응답:", postRes);
       console.log("여행 정보 업데이트 응답:", updateRes);
       
-      alert('게시글로 전환 성공!');
-      onClose(); // 성공 후 닫기
+      setOpenSuccessDialog(true);
     } catch (e: any) {
       console.error('게시글 전환 오류:', e);
       console.error('오류 응답 데이터:', e.response?.data);
-      alert('게시글 전환 실패: ' + (e.response?.data?.message || e.message));
+      setDialogMessage('게시글 전환 실패: ' + (e.response?.data?.message || e.message));
+      setOpenErrorDialog(true);
     }
+  };
+
+  // 성공 다이얼로그 닫기 핸들러
+  const handleSuccessClose = () => {
+    setOpenSuccessDialog(false);
+    onClose(); // 성공 후 닫기
   };
 
   useEffect(() => {
@@ -233,6 +248,33 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
         <Typography fontSize={16} fontWeight={500} mb={3}>여행 계획 보기</Typography>
         <TravelPlanViewer days={days} />
       </Box>
+
+      {/* 오류 다이얼로그 */}
+      <CustomDialog
+        open={openErrorDialog}
+        onClose={() => setOpenErrorDialog(false)}
+        title="오류"
+      >
+        <Typography>{dialogMessage}</Typography>
+      </CustomDialog>
+
+      {/* 성공 다이얼로그 */}
+      <CustomDialog
+        open={openSuccessDialog}
+        onClose={handleSuccessClose}
+        title="성공"
+      >
+        <Typography>게시글로 작성 완료!</Typography>
+      </CustomDialog>
+
+      {/* 제목 입력 알림 다이얼로그 */}
+      <CustomDialog
+        open={openTitleDialog}
+        onClose={() => setOpenTitleDialog(false)}
+        title="알림"
+      >
+        <Typography >제목을 입력해주세요.</Typography>
+      </CustomDialog>
     </Container>
   );
 }

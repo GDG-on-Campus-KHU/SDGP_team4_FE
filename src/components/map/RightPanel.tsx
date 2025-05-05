@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from '@emotion/styled';
-import { Box, Button, Typography } from '@mui/material';
+import { Box, Button, Typography, DialogContentText } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -8,6 +8,7 @@ import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { TransportMode, DayPlan, Plan } from '@/type/plan';
 import { useEffect, useState } from 'react';
 import api from '@/utils/axios';
+import CustomDialog from '@/components/common/CustomDialog';
 
 interface RightPanelProps {
     isOpen: boolean;
@@ -53,6 +54,10 @@ const RightPanel = ({
     onResetPlaces,
 }: RightPanelProps) => {
     const [totalTravelTime, setTotalTravelTime] = useState(0);
+    const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+    const [openSuccessDialog, setOpenSuccessDialog] = useState(false);
+    const [openErrorDialog, setOpenErrorDialog] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
         const currentPlan = dayPlans.find(plan =>
@@ -75,11 +80,22 @@ const RightPanel = ({
             plan.date.toDateString() === currentDate.toDateString()
         );
         
-        if (currentPlan && window.confirm('선택한 날짜의 모든 장소가 삭제됩니다. 계속하시겠습니까?')) {
+        if (currentPlan) {
+            setOpenConfirmDialog(true);
+        }
+    };
+
+    const confirmReset = () => {
+        const currentPlan = dayPlans.find(plan => 
+            plan.date.toDateString() === currentDate.toDateString()
+        );
+        
+        if (currentPlan) {
             currentPlan.places.forEach(place => {
                 onDeletePlace(currentDate.toDateString(), place.id);
             });
         }
+        setOpenConfirmDialog(false);
     };
 
     // 시간 포맷팅 함수 추가
@@ -123,129 +139,175 @@ const RightPanel = ({
             await api.post(`/v1/travel/${travelId}/course`, courses);
 
             // 성공 시 처리
-            alert('여행 일정이 성공적으로 등록되었습니다.');
-            window.location.href = '/my';
+            setOpenSuccessDialog(true);
 
         } catch (error) {
             console.error('Error:', error);
-            alert('여행 일정 등록에 실패했습니다.');
+            setErrorMessage('여행 일정 등록에 실패했습니다.');
+            setOpenErrorDialog(true);
         }
     };
 
+    const handleSuccessClose = () => {
+        setOpenSuccessDialog(false);
+        window.location.href = '/my';
+    };
+
     return (
-        <RightPanelWrapper open={isOpen}>
-            <PanelToggleButton onClick={onTogglePanel}>
-                {isOpen ?
-                    <KeyboardArrowDownIcon sx={{ color: '#9A9A9A' }} /> :
-                    <KeyboardArrowUpIcon sx={{ color: '#9A9A9A' }} />
-                }
-            </PanelToggleButton>
-            <Planinfo onClick={onOpenModal} style={{ cursor: 'pointer' }}>
-                <Typography fontWeight={500}>{plan.region}</Typography>
-                <Typography fontSize={12}>
-                    {plan.startDate.toLocaleDateString()} ~{' '}
-                    {plan.endDate.toLocaleDateString()}
-                </Typography>
-            </Planinfo>
-            {isOpen && (
-                <PlanContents>
-                    <DaySelector>
-                        <ArrowButton
-                            disabled={currentDateIndex === 0}
-                            onClick={() => onDateChange(Math.max(currentDateIndex - 1, 0))}
-                        >
-                            ◀
-                        </ArrowButton>
-                        <Typography fontSize={15} fontWeight={500} sx={{ textAlign: 'center' }}>
-                            {currentDate.toLocaleDateString()}
-                        </Typography>
-                        <ArrowButton
-                            disabled={currentDateIndex === dateRange.length - 1}
-                            onClick={() => onDateChange(Math.min(currentDateIndex + 1, dateRange.length - 1))}
-                        >
-                            ▶
-                        </ArrowButton>
-                    </DaySelector>
-                    
-                    {currentDate && (
-                        <>
-                            {(() => {
-                                const currentPlan = dayPlans.find(plan =>
-                                    plan.date.toDateString() === currentDate.toDateString()
-                                );
+        <>
+            <RightPanelWrapper open={isOpen}>
+                <PanelToggleButton onClick={onTogglePanel}>
+                    {isOpen ?
+                        <KeyboardArrowDownIcon sx={{ color: '#9A9A9A' }} /> :
+                        <KeyboardArrowUpIcon sx={{ color: '#9A9A9A' }} />
+                    }
+                </PanelToggleButton>
+                <Planinfo onClick={onOpenModal} style={{ cursor: 'pointer' }}>
+                    <Typography fontWeight={500}>{plan.region}</Typography>
+                    <Typography fontSize={12}>
+                        {plan.startDate.toLocaleDateString()} ~{' '}
+                        {plan.endDate.toLocaleDateString()}
+                    </Typography>
+                </Planinfo>
+                {isOpen && (
+                    <PlanContents>
+                        <DaySelector>
+                            <ArrowButton
+                                disabled={currentDateIndex === 0}
+                                onClick={() => onDateChange(Math.max(currentDateIndex - 1, 0))}
+                            >
+                                ◀
+                            </ArrowButton>
+                            <Typography fontSize={15} fontWeight={500} sx={{ textAlign: 'center' }}>
+                                {currentDate.toLocaleDateString()}
+                            </Typography>
+                            <ArrowButton
+                                disabled={currentDateIndex === dateRange.length - 1}
+                                onClick={() => onDateChange(Math.min(currentDateIndex + 1, dateRange.length - 1))}
+                            >
+                                ▶
+                            </ArrowButton>
+                        </DaySelector>
+                        
+                        {currentDate && (
+                            <>
+                                {(() => {
+                                    const currentPlan = dayPlans.find(plan =>
+                                        plan.date.toDateString() === currentDate.toDateString()
+                                    );
 
-                                return currentPlan?.places.length ? (
-                                    <>
-                                        <ResetButton onClick={handleReset}>
-                                            장소선택 초기화
-                                        </ResetButton>
-                                        <PlaceList>
-                                            {currentPlan.places.map((place, index) => (
-                                                console.log("삭제시간확인", place),
-                                                <PlaceItem key={place.id}>
-                                                    <PlaceNumber>{index + 1}</PlaceNumber>
-                                                    <PlaceContent>
-                                                        <PlaceInfo>
-                                                            <PlaceName>{place.name}</PlaceName>
-                                                            <PlaceAddress>
-                                                                {place.address.split(' ').slice(1).join(' ')}
-                                                            </PlaceAddress>
-                                                        </PlaceInfo>
-                                                        {index > 0 && place.travelDurationText && (
-                                                            <TravelTime>
-                                                                {place.travelDurationText}
-                                                            </TravelTime>
-                                                        )}
-                                                        <DeleteButton onClick={() => onDeletePlace(currentDate.toDateString(), place.id)}>
-                                                            <img src="/icons/trash.svg" alt="delete" />
-                                                        </DeleteButton>
-                                                    </PlaceContent>
-                                                </PlaceItem>
-                                            ))}
-                                        </PlaceList>
-                                        <EstimatedTimeBox>
-                                            <div>
-                                                <Typography fontSize={12}>예상 총 이동시간</Typography>
-                                                <Typography fontWeight={600}>
-                                                    {formatTravelTime(totalTravelTime)}
-                                                </Typography>
-                                            </div>
-                                            <TransportModeSelector>
-                                                <TransportButton selected={transportMode === 'WALKING'} onClick={() => onTransportModeChange('WALKING')}>
-                                                    도보
-                                                </TransportButton>
-                                                <TransportButton selected={transportMode === 'TRANSIT'} onClick={() => onTransportModeChange('TRANSIT')}>
-                                                    대중교통
-                                                </TransportButton>
-                                                <TransportButton selected={transportMode === 'DRIVING'} onClick={() => onTransportModeChange('DRIVING')}>
-                                                    자동차
-                                                </TransportButton>
-                                            </TransportModeSelector>
-                                        </EstimatedTimeBox>
-                                    </>
-                                ) : (
-                                    <NoPlan>
-                                        장소를 추가해 <br />
-                                        여행 계획을 세워보세요!
-                                    </NoPlan>
-                                );
-                            })()}
-                        </>
-                    )}
+                                    return currentPlan?.places.length ? (
+                                        <>
+                                            <ResetButton onClick={handleReset}>
+                                                장소선택 초기화
+                                            </ResetButton>
+                                            <PlaceList>
+                                                {currentPlan.places.map((place, index) => (
+                                                    console.log("삭제시간확인", place),
+                                                    <PlaceItem key={place.id}>
+                                                        <PlaceNumber>{index + 1}</PlaceNumber>
+                                                        <PlaceContent>
+                                                            <PlaceInfo>
+                                                                <PlaceName>{place.name}</PlaceName>
+                                                                <PlaceAddress>
+                                                                    {place.address.split(' ').slice(1).join(' ')}
+                                                                </PlaceAddress>
+                                                            </PlaceInfo>
+                                                            {index > 0 && place.travelDurationText && (
+                                                                <TravelTime>
+                                                                    {place.travelDurationText}
+                                                                </TravelTime>
+                                                            )}
+                                                            <DeleteButton onClick={() => onDeletePlace(currentDate.toDateString(), place.id)}>
+                                                                <img src="/icons/trash.svg" alt="delete" />
+                                                            </DeleteButton>
+                                                        </PlaceContent>
+                                                    </PlaceItem>
+                                                ))}
+                                            </PlaceList>
+                                            <EstimatedTimeBox>
+                                                <div>
+                                                    <Typography fontSize={12}>예상 총 이동시간</Typography>
+                                                    <Typography fontWeight={600}>
+                                                        {formatTravelTime(totalTravelTime)}
+                                                    </Typography>
+                                                </div>
+                                                <TransportModeSelector>
+                                                    <TransportButton selected={transportMode === 'WALKING'} onClick={() => onTransportModeChange('WALKING')}>
+                                                        도보
+                                                    </TransportButton>
+                                                    <TransportButton selected={transportMode === 'TRANSIT'} onClick={() => onTransportModeChange('TRANSIT')}>
+                                                        대중교통
+                                                    </TransportButton>
+                                                    <TransportButton selected={transportMode === 'DRIVING'} onClick={() => onTransportModeChange('DRIVING')}>
+                                                        자동차
+                                                    </TransportButton>
+                                                </TransportModeSelector>
+                                            </EstimatedTimeBox>
+                                        </>
+                                    ) : (
+                                        <NoPlan>
+                                            장소를 추가해 <br />
+                                            여행 계획을 세워보세요!
+                                        </NoPlan>
+                                    );
+                                })()}
+                            </>
+                        )}
 
-                    <BottomSection>
-                        <Button 
-                            color="primary" 
-                            variant="contained" 
-                            fullWidth
-                            onClick={handleCreateTravel}
-                        >
-                            + 여행 일정 등록하기
-                        </Button>
-                    </BottomSection>
-                </PlanContents>
-            )}
-        </RightPanelWrapper>
+                        <BottomSection>
+                            <Button 
+                                color="primary" 
+                                variant="contained" 
+                                fullWidth
+                                onClick={handleCreateTravel}
+                            >
+                                + 여행 일정 등록하기
+                            </Button>
+                        </BottomSection>
+                    </PlanContents>
+                )}
+            </RightPanelWrapper>
+
+            {/* 확인 모달 */}
+            <CustomDialog
+                open={openConfirmDialog}
+                onClose={() => setOpenConfirmDialog(false)}
+                title="확인"
+                confirmButtonText="삭제"
+                onConfirm={confirmReset}
+                showCancelButton={true}
+            >
+                <DialogContentText>
+                    선택한 날짜의 모든 장소가 삭제됩니다. 계속하시겠습니까?
+                </DialogContentText>
+            </CustomDialog>
+
+            {/* 성공 모달 */}
+            <CustomDialog
+                open={openSuccessDialog}
+                onClose={handleSuccessClose}
+                title="성공"
+                confirmButtonText="확인"
+                onConfirm={handleSuccessClose}
+            >
+                <DialogContentText>
+                    여행 일정이 성공적으로 등록되었습니다.
+                </DialogContentText>
+            </CustomDialog>
+
+            {/* 에러 모달 */}
+            <CustomDialog
+                open={openErrorDialog}
+                onClose={() => setOpenErrorDialog(false)}
+                title="오류"
+                confirmButtonText="확인"
+            >
+                <DialogContentText>
+                    {errorMessage}
+                </DialogContentText>
+            </CustomDialog>
+        </>
     );
 };
 

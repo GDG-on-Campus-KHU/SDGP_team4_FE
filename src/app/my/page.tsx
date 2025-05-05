@@ -6,6 +6,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import styled from '@emotion/styled';
 import { useRouter } from 'next/navigation';
 import EditProfileModal from '@/components/my/EditProfileModal';
+import CustomDialog from '@/components/common/CustomDialog';
 import api from '@/utils/axios';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 
@@ -109,6 +110,14 @@ export default function MyPage() {
   const [userInfo, setUserInfo] = useState<UserInfo>({ nickname: '', region: '' });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Dialog 상태 관리
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [openUnsaveDialog, setOpenUnsaveDialog] = useState(false);
+  const [openErrorDialog, setOpenErrorDialog] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [selectedTravelId, setSelectedTravelId] = useState<number | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
 
   // 사용자 정보 fetch 함수
   const fetchUserInfo = async () => {
@@ -246,25 +255,43 @@ export default function MyPage() {
   };
 
   // 여행 삭제 함수
-  const handleDeleteTravel = async (travelId: number) => {
-    if (!window.confirm('정말 삭제하시겠습니까?')) return;
+  const handleDeleteTravel = (travelId: number) => {
+    setSelectedTravelId(travelId);
+    setOpenDeleteDialog(true);
+  };
+
+  // 확인 후 삭제 처리
+  const confirmDeleteTravel = async () => {
+    if (selectedTravelId === null) return;
+    
     try {
-      await api.delete(`/v1/travel/${travelId}`);
-      setTravels((prev) => prev.filter((t) => t.travelId !== travelId));
+      await api.delete(`/v1/travel/${selectedTravelId}`);
+      setTravels((prev) => prev.filter((t) => t.travelId !== selectedTravelId));
+      setOpenDeleteDialog(false);
     } catch (error) {
-      alert('삭제에 실패했습니다.');
+      setErrorMessage('삭제에 실패했습니다.');
+      setOpenErrorDialog(true);
       console.error('Error deleting travel:', error);
     }
   };
 
   // 저장 취소 함수
-  const handleUnsavePost = async (postId: number) => {
-    if (!window.confirm('저장을 취소하시겠습니까?')) return;
+  const handleUnsavePost = (postId: number) => {
+    setSelectedPostId(postId);
+    setOpenUnsaveDialog(true);
+  };
+
+  // 확인 후 저장 취소 처리
+  const confirmUnsavePost = async () => {
+    if (selectedPostId === null) return;
+    
     try {
-      await api.post(`/v1/post/${postId}`);
-      setSavedPosts((prev) => prev.filter((p) => p.postId !== postId));
+      await api.post(`/v1/post/${selectedPostId}`);
+      setSavedPosts((prev) => prev.filter((p) => p.postId !== selectedPostId));
+      setOpenUnsaveDialog(false);
     } catch (error) {
-      alert('저장 취소에 실패했습니다.');
+      setErrorMessage('저장 취소에 실패했습니다.');
+      setOpenErrorDialog(true);
       console.error('Error unsaving post:', error);
     }
   };
@@ -443,53 +470,91 @@ export default function MyPage() {
   };
 
   return (
-    <Container>
-      <Sidebar>
-        <Box
-          sx={{
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            backgroundColor: '#D2E0FB',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 2,
-          }}
-        >
-          <PersonIcon sx={{ fontSize: 55, color: 'white' }} />
-        </Box>
-        <Typography fontSize={16} fontWeight="500">{userInfo.nickname || '여행탐험가'}</Typography>
-        <Typography fontSize={13} mt={0.5}>나의 지역: {userInfo.region || '정보 없음'}</Typography>
-        <Button
-          variant="outlined"
-          sx={{ mt: 4, borderRadius: '20px' }}
-          onClick={() => setIsEditModalOpen(true)}
-        >
-          회원정보 수정
-        </Button>
-        <Typography fontSize={12} color="#9A9A9A" mt={2} sx={{ cursor: 'pointer' }}>로그아웃</Typography>
-      </Sidebar>
+    <>
+      <Container>
+        <Sidebar>
+          <Box
+            sx={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              backgroundColor: '#D2E0FB',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 2,
+            }}
+          >
+            <PersonIcon sx={{ fontSize: 55, color: 'white' }} />
+          </Box>
+          <Typography fontSize={16} fontWeight="500">{userInfo.nickname || '여행탐험가'}</Typography>
+          <Typography fontSize={13} mt={0.5}>나의 지역: {userInfo.region || '정보 없음'}</Typography>
+          <Button
+            variant="outlined"
+            sx={{ mt: 4, borderRadius: '20px' }}
+            onClick={() => setIsEditModalOpen(true)}
+          >
+            회원정보 수정
+          </Button>
+          <Typography fontSize={12} color="#9A9A9A" mt={2} sx={{ cursor: 'pointer' }}>로그아웃</Typography>
+        </Sidebar>
 
-      <EditProfileModal
-        open={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        currentNickname={userInfo.nickname}
-        currentRegion={userInfo.region}
-        onSave={handleProfileUpdate}
-      />
+        <EditProfileModal
+          open={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          currentNickname={userInfo.nickname}
+          currentRegion={userInfo.region}
+          onSave={handleProfileUpdate}
+        />
 
-      <MainContent>
-        <Typography variant="h6" fontWeight="bold" mb={2}>마이 페이지</Typography>
-        <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 2 }}>
-          <Tab label="나의 여행" />
-          <Tab label="나의 여행일지" />
-          <Tab label="저장한 여행" />
-        </Tabs>
+        <MainContent>
+          <Typography variant="h6" fontWeight="bold" mb={2}>마이 페이지</Typography>
+          <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 2 }}>
+            <Tab label="나의 여행" />
+            <Tab label="나의 여행일지" />
+            <Tab label="저장한 여행" />
+          </Tabs>
 
-        {renderContent()}
-      </MainContent>
-    </Container>
+          {renderContent()}
+        </MainContent>
+      </Container>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <CustomDialog
+        open={openDeleteDialog}
+        onClose={() => setOpenDeleteDialog(false)}
+        title="확인"
+        confirmButtonText="삭제"
+        cancelButtonText="취소"
+        onConfirm={confirmDeleteTravel}
+        showCancelButton={true}
+      >
+        <Typography>정말 삭제하시겠습니까?</Typography>
+      </CustomDialog>
+
+      {/* 저장 취소 확인 다이얼로그 */}
+      <CustomDialog
+        open={openUnsaveDialog}
+        onClose={() => setOpenUnsaveDialog(false)}
+        title="확인"
+        confirmButtonText="확인"
+        cancelButtonText="취소"
+        onConfirm={confirmUnsavePost}
+        showCancelButton={true}
+      >
+        <Typography>저장을 취소하시겠습니까?</Typography>
+      </CustomDialog>
+
+      {/* 오류 다이얼로그 */}
+      <CustomDialog
+        open={openErrorDialog}
+        onClose={() => setOpenErrorDialog(false)}
+        title="알림"
+        confirmButtonText="확인"
+      >
+        <Typography>{errorMessage}</Typography>
+      </CustomDialog>
+    </>
   );
 }
 
