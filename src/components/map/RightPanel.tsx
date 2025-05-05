@@ -24,6 +24,9 @@ interface RightPanelProps {
     onTransportModeChange: (mode: TransportMode) => void;
     onDeletePlace: (dateStr: string, placeId: string) => void;
     onResetPlaces?: (dateStr: string) => void;
+    isEditMode?: boolean;
+    onSave?: () => void;
+    onCancel?: () => void;
 }
 
 interface CreateTravelResponse {
@@ -52,6 +55,9 @@ const RightPanel = ({
     onTransportModeChange,
     onDeletePlace,
     onResetPlaces,
+    isEditMode,
+    onSave,
+    onCancel,
 }: RightPanelProps) => {
     const [totalTravelTime, setTotalTravelTime] = useState(0);
     const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
@@ -136,7 +142,8 @@ const RightPanel = ({
                 );
 
             // 3. 여행 코스 등록 요청
-            await api.post(`/v1/travel/${travelId}/course`, courses);
+            const res = await api.post(`/v1/travel/${travelId}/course`, courses);
+            console.log("res", res);
 
             // 성공 시 처리
             setOpenSuccessDialog(true);
@@ -256,14 +263,25 @@ const RightPanel = ({
                         )}
 
                         <BottomSection>
-                            <Button 
-                                color="primary" 
-                                variant="contained" 
-                                fullWidth
-                                onClick={handleCreateTravel}
-                            >
-                                + 여행 일정 등록하기
-                            </Button>
+                            {isEditMode ? (
+                                <ButtonContainer>
+                                    <SaveButton variant="contained" onClick={onSave}>
+                                        저장하고 나가기
+                                    </SaveButton>
+                                    <CancelButton variant="outlined" onClick={onCancel}>
+                                        취소
+                                    </CancelButton>
+                                </ButtonContainer>
+                            ) : (
+                                <Button 
+                                    color="primary" 
+                                    variant="contained" 
+                                    fullWidth
+                                    onClick={handleCreateTravel}
+                                >
+                                    + 여행 일정 등록하기
+                                </Button>
+                            )}
                         </BottomSection>
                     </PlanContents>
                 )}
@@ -527,6 +545,19 @@ const TransportButton = styled.button<{ selected: boolean }>`
   transition: all 0.2s ease;
 `;
 
+const ButtonContainer = styled(Box)`
+  display: flex;
+  gap: 10px;
+  width: 100%;
+`;
+
+const SaveButton = styled(Button)`
+  flex: 1;
+`;
+
+const CancelButton = styled(Button)`
+  flex: 1;
+`;
 
 export default RightPanel;
 

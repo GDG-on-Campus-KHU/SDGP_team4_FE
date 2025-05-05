@@ -139,7 +139,7 @@ export default function MyPage() {
   const fetchTravels = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get<TravelResponse>('/v1/member/travel');
+      const { data } = await api.get<TravelResponse>('/v1/member/travel?page=0&size=10');
 
       if (data?.data?.content) {
         console.log("여행 계획:", data.data.content);
@@ -383,7 +383,7 @@ export default function MyPage() {
               onClick={() => router.push(`/my/${trip.travelId}`)}
               sx={{ cursor: 'pointer' }}
             >
-              {trip.isPost && trip.thumbnail && (
+              {trip.thumbnail && (
                 <CardMedia
                   component="img"
                   image={trip.thumbnail}
@@ -419,10 +419,10 @@ export default function MyPage() {
                 <Typography
                   fontSize={14}
                   sx={{
-                    color: trip.isPost ? '#585858' : '#9A9A9A',
+                    color: trip.title ? '#585858' : '#9A9A9A',
                   }}
                 >
-                  {trip.isPost ? trip.title : '여행 일지를 작성해보세요!'}
+                  {trip.title ? trip.title : '여행 일지를 작성해보세요!'}
                 </Typography>
                 <Typography fontSize={12} color="#8C8C8C" mt={1}>
                   📅 {formatDateRange(trip.startDate, trip.endDate)}

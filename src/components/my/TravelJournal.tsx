@@ -46,6 +46,15 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
   const [openTitleDialog, setOpenTitleDialog] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
 
+  // 에디터 초기화
+  useEffect(() => {
+    // 에디터가 마운트된 후 내용 초기화
+    if (editorRef.current) {
+      const editorInstance = editorRef.current.getInstance();
+      editorInstance.setHTML('');
+    }
+  }, []);
+
   // 이미지 업로드 핸들러
   const handleImageUpload = async (file: File, callback: (url: string, altText: string) => void) => {
     try {

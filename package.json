@@ -17,6 +17,7 @@
     "@mui/x-date-pickers": "^7.28.3",
     "@mui/x-date-pickers-pro": "^7.28.3",
     "@react-google-maps/api": "^2.20.6",
+    "@reduxjs/toolkit": "^2.7.0",
     "@tiptap/extension-placeholder": "^2.11.9",
     "@tiptap/pm": "^2.11.9",
     "@tiptap/react": "^2.11.9",
@@ -32,6 +33,7 @@
     "react": "^19.0.0",
     "react-date-range": "^2.0.1",
     "react-dom": "^19.0.0",
+    "react-redux": "^9.2.0",
     "styled-components": "^6.1.17",
     "tailwindcss": "^4.1.4",
     "tui-color-picker": "^2.2.8"

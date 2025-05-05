@@ -1,6 +1,6 @@
 'use client';
 import { GoogleMap, Marker, Polyline, OverlayView, useJsApiLoader } from '@react-google-maps/api';
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Box, Button } from '@mui/material';
 import styled from '@emotion/styled';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -12,6 +12,8 @@ import RightPanel from '@/components/map/RightPanel';
 import { TransportMode, PlaceItem as BasePlaceItem, DayPlan, Plan } from '@/type/plan';
 import ChatIcon from '@mui/icons-material/Chat';
 import api from '@/utils/axios';
+import { useAppSelector, useAppDispatch } from '@/redux/hooks';
+import { setEditingMode, resetTravelInfo } from '@/redux/slices/travelSlice';
 
 const containerStyle = {
   width: '100%',
@@ -701,6 +703,200 @@ export default function MapPage() {
     }
   }, [map, pendingSearchResult, handleMarkerClick, calculateDistance]);
 
+  // Redux 상태 및 디스패치 추가
+  const dispatch = useAppDispatch();
+  const travelInfo = useAppSelector(state => state.travel);
+  
+  // Redux 상태의 여행 정보로 초기화하는 useEffect 추가
+  useEffect(() => {
+    // Google Maps API가 로드되었는지 확인
+    if (!isLoaded) return;
+    
+    // travelInfo.isEditing이 true인 경우 Redux 데이터로 초기화
+    if (travelInfo.isEditing && travelInfo.travelId) {
+      console.log('Redux에서 여행 정보 로드:', travelInfo);
+      
+      // 1. 여행 계획 정보 설정
+      setPlan({
+        region: travelInfo.area,
+        startDate: new Date(travelInfo.startDate),
+        endDate: new Date(travelInfo.endDate)
+      });
+      
+      // 2. 임시 장소 데이터 생성 (지오코딩 전)
+      const formattedDays: DayPlan[] = travelInfo.days.map(day => {
+        // 각 장소에 필요한 속성 추가 (임시 좌표 설정)
+        const places: PlaceItem[] = day.places.map((place: any) => {
+          // moveTime이 있으면 사용하여 이동시간 설정
+          const moveTime = place.moveTime || 0;
+          
+          return {
+            id: generateUniqueId(),
+            name: place.name,
+            address: place.address,
+            location: {
+              lat: 37.5665, // 임시 좌표
+              lng: 126.9780
+            },
+            travelDuration: moveTime,
+            travelDurationText: moveTime > 0 ? `${moveTime}분` : '',
+            memo: place.description || ''
+          } as PlaceItem;
+        });
+        
+        return {
+          date: new Date(day.date),
+          places
+        };
+      });
+      
+      setDayPlans(formattedDays);
+      
+      // 3. 편집 모드 알림 표시 - 최초 접속 시에만 표시
+      if (!sessionStorage.getItem('editModeAlertShown')) {
+        alert('여행 정보를 수정 모드로 불러왔습니다. 장소를 추가하거나 변경할 수 있습니다.');
+        sessionStorage.setItem('editModeAlertShown', 'true');
+      }
+      
+      // 4. 지오코딩으로 장소 좌표 업데이트
+      const geocodeAndUpdatePlaces = async () => {
+        if (!google || !google.maps) return;
+        
+        const geocoder = new google.maps.Geocoder();
+        const updatedDays = [...formattedDays];
+        let isUpdated = false;
+        
+        // 모든 날짜의 모든 장소에 대해 지오코딩 수행
+        for (let dayIndex = 0; dayIndex < updatedDays.length; dayIndex++) {
+          const day = updatedDays[dayIndex];
+          
+          for (let placeIndex = 0; placeIndex < day.places.length; placeIndex++) {
+            const place = day.places[placeIndex];
+            
+            // 검색 키워드 설정 (주소 또는 이름)
+            const searchKeyword = place.address || place.name;
+            if (!searchKeyword) continue;
+            
+            try {
+              // 지오코딩 수행
+              const result = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+                geocoder.geocode({ address: searchKeyword, region: 'kr' }, (results, status) => {
+                  if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
+                    resolve(results);
+                  } else {
+                    reject(status);
+                  }
+                });
+              });
+              
+              // 첫 번째 결과의 좌표 사용
+              const location = result[0].geometry.location;
+              
+              // 장소 좌표 업데이트
+              updatedDays[dayIndex].places[placeIndex].location = {
+                lat: location.lat(),
+                lng: location.lng()
+              };
+              
+              isUpdated = true;
+              
+              // 짧은 딜레이 추가 (API 제한 방지)
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+            } catch (error) {
+              console.error(`지오코딩 실패: ${searchKeyword}`, error);
+            }
+          }
+        }
+        
+        // 좌표가 업데이트된 경우에만 상태 업데이트
+        if (isUpdated) {
+          setDayPlans(updatedDays);
+          console.log('지오코딩으로 장소 좌표 업데이트 완료:', updatedDays);
+        }
+      };
+      
+      // 지오코딩 실행
+      geocodeAndUpdatePlaces();
+    }
+  }, [isLoaded, travelInfo]);
+
+  // 이동시간 재계산을 위한 별도의 useEffect
+  useEffect(() => {
+    // Google Maps API가 로드되었는지 확인
+    if (!isLoaded) return;
+    
+    // 편집 모드이고 dayPlans가 로드된 경우에만 실행
+    if (travelInfo.isEditing && travelInfo.travelId && dayPlans.length > 0) {
+      // 이동시간 재계산이 이미 수행되었는지 확인
+      const recalcKey = `recalc-${travelInfo.travelId}`;
+      if (!sessionStorage.getItem(recalcKey)) {
+        // 이동시간 다시 계산 (지연 실행)
+        const timer = setTimeout(() => {
+          recalculateAllTravelTimes();
+          sessionStorage.setItem(recalcKey, 'true');
+        }, 1500);
+        
+        // 컴포넌트 언마운트 시 타이머 정리
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isLoaded, dayPlans.length, travelInfo.isEditing, travelInfo.travelId]);
+
+  // 저장 및 종료 핸들러 추가
+  const handleSaveAndExit = async () => {
+    if (!plan || !travelInfo.travelId) return;
+    
+    try {
+      // 서버에 저장할 데이터 준비
+      const travelUpdateDto = {
+        title: travelInfo.title,
+        area: plan.region,
+        thumbnail: null, // 필요시 수정
+        startDate: travelInfo.startDate, 
+        endDate: travelInfo.endDate
+      };
+      
+      // 코스 데이터 준비
+      const courseUpdateDto = dayPlans.flatMap(day => 
+        day.places.map(place => ({
+          name: place.name,
+          address: place.address,
+          description: (place as any).memo || "", // memo 필드를 description으로 매핑
+          courseDate: day.date.toISOString().split('T')[0], // 날짜 포맷 변환
+          moveTime: place.travelDuration || 0
+        }))
+      );
+      
+      // API 요청
+      await api.put(`/v1/travel/${travelInfo.travelId}`, {
+        travelUpdateDto,
+        courseUpdateDto
+      });
+      
+      alert('여행 정보가 성공적으로 저장되었습니다.');
+      
+      // Redux 상태 초기화
+      dispatch(resetTravelInfo());
+      
+      // 알림 플래그만 유지하고 다른 sessoinStorage 항목은 제거할 필요가 있다면 여기에 추가
+      
+      // 이전 페이지로 이동
+      window.history.back();
+    } catch (error) {
+      console.error('여행 정보 저장 실패:', error);
+      alert('여행 정보 저장에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
+  
+  // 취소 핸들러
+  const handleCancel = () => {
+    if (confirm('변경 사항을 저장하지 않고 나가시겠습니까?')) {
+      dispatch(resetTravelInfo());
+      window.history.back();
+    }
+  };
+
   if (!isLoaded) return <div>지도를 불러오는 중...</div>;
 
   return (
@@ -856,6 +1052,9 @@ export default function MapPage() {
           transportMode={transportMode}
           onTransportModeChange={handleTransportModeChange}
           onDeletePlace={handleDeletePlace}
+          isEditMode={travelInfo.isEditing}
+          onSave={handleSaveAndExit}
+          onCancel={handleCancel}
         />
       ) : (
         <FloatingButton
@@ -885,7 +1084,6 @@ const Container = styled(Box)`
   height: calc(100dvh - 70px);
   overflow: hidden;
 `;
-
 
 const ToggleButton = styled('div') <{ sidebarOpen: boolean }>`
   position: absolute;
@@ -922,97 +1120,96 @@ const MapWrapper = styled(Box)`
   z-index: 1;
 `;
 
+// 스타일 컴포넌트 수정
+const MarkerContainer = styled.div<{ isNew: boolean; isSelected?: boolean }>`
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: ${props => props.isNew ? 'bounce 0.5s ease' : 'none'};
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  
+  /* 선택된 마커 강조 효과 */
+  transform: ${props => props.isSelected ? 'scale(1.1)' : 'scale(1)'};
+  
+  &:hover {
+    transform: scale(1.05);
+  }
 
-  // 스타일 컴포넌트 수정
-  const MarkerContainer = styled.div<{ isNew: boolean; isSelected?: boolean }>`
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    animation: ${props => props.isNew ? 'bounce 0.5s ease' : 'none'};
-    cursor: pointer;
-    transition: transform 0.2s ease;
-    
-    /* 선택된 마커 강조 효과 */
-    transform: ${props => props.isSelected ? 'scale(1.1)' : 'scale(1)'};
-    
-    &:hover {
-      transform: scale(1.05);
+  @keyframes bounce {
+    0% {
+      transform: translateY(-50px);
+      opacity: 0;
     }
-
-    @keyframes bounce {
-      0% {
-        transform: translateY(-50px);
-        opacity: 0;
-      }
-      60% {
-        transform: translateY(10px);
-        opacity: 1;
-      }
-      80% {
-        transform: translateY(-5px);
-      }
-      100% {
-        transform: translateY(0);
-      }
+    60% {
+      transform: translateY(10px);
+      opacity: 1;
     }
-  `;
-
-  const NumberMarker = styled.div`
-    width: 24px;
-    height: 24px;
-    background: #557EB3;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: bold;
-    font-size: 14px;
-    position: absolute;
-    top: -12px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 2;
-  `;
-
-  const CommentBubble = styled.div<{ isSelected?: boolean }>`
-    background: ${props => props.isSelected ? '#FEF9D9' : 'white'};
-    border: 1px solid #C1C1C1;
-    border-radius: 10px;
-    padding: 6px 10px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-top: 12px;
-    font-size: 14px;
-    transition: background-color 0.2s ease;
-  `;
-
-  // 피드백 툴팁 스타일 수정
-  const FeedbackTooltip = styled.div`
-    position: absolute;
-    top: -35px; /* 마커 위에 표시 */
-    background: #FEF9D9;
-    border-radius: 10px;
-    padding: 12px;
-    display: flex;
-    gap: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    min-width: 120px;
-    z-index: 3;
-  `;
-
-  const FeedbackItem = styled.div`
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    
-    span {
-      color: #666;
+    80% {
+      transform: translateY(-5px);
     }
-  `;
+    100% {
+      transform: translateY(0);
+    }
+  }
+`;
+
+const NumberMarker = styled.div`
+  width: 24px;
+  height: 24px;
+  background: #557EB3;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+`;
+
+const CommentBubble = styled.div<{ isSelected?: boolean }>`
+  background: ${props => props.isSelected ? '#FEF9D9' : 'white'};
+  border: 1px solid #C1C1C1;
+  border-radius: 10px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-top: 12px;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+`;
+
+// 피드백 툴팁 스타일 수정
+const FeedbackTooltip = styled.div`
+  position: absolute;
+  top: -35px; /* 마커 위에 표시 */
+  background: #FEF9D9;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  min-width: 120px;
+  z-index: 3;
+`;
+
+const FeedbackItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  
+  span {
+    color: #666;
+  }
+`;
 
 

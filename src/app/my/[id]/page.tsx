@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
 import { Box, Typography, Button, IconButton } from '@mui/material';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import CircularProgress from '@mui/material/CircularProgress';
 import api from '@/utils/axios';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import TravelJournal from '@/components/my/TravelJournal';
+import { useAppDispatch } from '@/redux/hooks';
+import { setTravelInfo } from '@/redux/slices/travelSlice';
 
 // 인터페이스 정의
 interface TravelInfoDto {
@@ -64,10 +66,13 @@ const LoadingContainer = styled(Box)`
 
 export default function TripDetailPage() {
     const params = useParams();
+    const router = useRouter();
+    const dispatch = useAppDispatch();
     const [currentPage, setCurrentPage] = useState(0);
     const [editingMemo, setEditingMemo] = useState<number | null>(null);
     const [memoText, setMemoText] = useState<string>('');
     const [tripData, setTripData] = useState<{
+        thumbnail: string | null;
         isPost: boolean;
         area: string;
         title: string;
@@ -84,6 +89,7 @@ export default function TripDetailPage() {
 
                 // 데이터 구조 변환
                 const formattedData = {
+                    thumbnail: data.data.travelInfoDto.thumbnail,
                     isPost: data.data.travelInfoDto.isPost,
                     area: data.data.travelInfoDto.area,
                     title: data.data.travelInfoDto.title,
@@ -150,8 +156,9 @@ export default function TripDetailPage() {
             // 2. travelUpdateDto 생성
             const [startDate, endDate] = tripData.dateRange.split(' ~ ');
             const travelUpdateDto = {
+                area: tripData.area,
                 title: tripData.title,
-                thumbnail: null, // 필요시 thumbnail 정보 추가
+                thumbnail: tripData.thumbnail,
                 startDate,
                 endDate,
             };
@@ -186,6 +193,24 @@ export default function TripDetailPage() {
         setMemoText(currentMemo);
     };
 
+    // 장소 수정하기 버튼 핸들러 추가
+    const handleEditPlaces = () => {
+        if (!tripData) return;
+        
+        // Redux 액션을 디스패치하여 여행 정보 저장
+        dispatch(setTravelInfo({
+            travelId: params.id as string,
+            title: tripData.title,
+            area: tripData.area,
+            startDate: tripData.dateRange.split(' ~ ')[0],
+            endDate: tripData.dateRange.split(' ~ ')[1],
+            days: tripData.days
+        }));
+        
+        // 지도 페이지로 이동
+        router.push('/map');
+    };
+
     return (
         <Container>
             {isWritingJournal ? (
@@ -210,10 +235,15 @@ export default function TripDetailPage() {
                                     <CalendarIcon>📅</CalendarIcon>
                                     {tripData.dateRange}
                                 </DateRange>
-                                <MapButton>지도에서 보기</MapButton>
+                                <MapButton onClick={() => router.push(`/map?viewTravelId=${params.id}`)}>지도에서 보기</MapButton>
                             </div>
                             <ButtonContainer>
-                                <StyledButton variant="outlined">장소 수정하기</StyledButton>
+                                <StyledButton 
+                                  variant="outlined"
+                                  onClick={handleEditPlaces}
+                                >
+                                  장소 수정하기
+                                </StyledButton>
                                 {tripData.isPost ? (
                                     <StyledButton
                                         variant="contained"

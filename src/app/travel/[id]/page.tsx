@@ -54,12 +54,8 @@ const TravelDetailPage = () => {
     if (id) fetchDetail();
   }, [id]);
 
-  // 수정 모드로 전환할 때 에디터 초기값 설정
-  useEffect(() => {
-    if (isEditing && post && editorRef.current) {
-      editorRef.current.getInstance().setHTML(post.description || '');
-    }
-  }, [isEditing, post]);
+
+
 
   const handleImageUpload = async (file: File, callback: (url: string, altText: string) => void) => {
     try {
@@ -107,17 +103,17 @@ const TravelDetailPage = () => {
 
     try {
       setLoading(true);
-      
+
       const editorContent = editorRef.current.getInstance().getHTML();
-      
+
       const updatedPost = {
         title: title,
         description: editorContent,
         imgUrls: uploadedImages // 배열 그대로 전송
       };
-      
+
       const response = await api.put(`/v1/post/${id}`, updatedPost);
-      
+
       if (response.status === 200) {
         console.log("수정내용확인", updatedPost);
         alert('게시글이 성공적으로 수정되었습니다.');
@@ -270,9 +266,9 @@ const TravelDetailPage = () => {
             </Header>
             <EditorContainer>
               <Editor
+                key={isEditing ? 'editing' : 'readonly'} // 강제로 리렌더링
                 ref={editorRef}
-                initialValue=""
-                placeholder="여행 일지를 작성해보세요!"
+                initialValue={post.description || ''} // 처음부터 내용을 전달
                 previewStyle="vertical"
                 height="400px"
                 initialEditType="wysiwyg"
@@ -281,7 +277,7 @@ const TravelDetailPage = () => {
                 plugins={[colorSyntax]}
                 language="ko-KR"
                 hooks={{
-                  addImageBlobHook: handleImageUpload
+                  addImageBlobHook: handleImageUpload,
                 }}
               />
             </EditorContainer>
@@ -411,6 +407,16 @@ const EditorContainer = styled(Box)`
   .toastui-editor-popup-color {
     border: none !important;
     box-shadow: 0 2px 4px rgba(0,0,0,0.08) !important;
+  }
+  
+  /* 편집하기, 미리보기 탭 강제 숨김 */
+  .toastui-editor-mode-switch {
+    display: none !important;
+  }
+  
+  /* 플레이스홀더 텍스트 강제 숨김 */
+  .toastui-editor-placeholder {
+    display: none !important;
   }
 `;
 
