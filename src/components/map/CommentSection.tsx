@@ -1,16 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
 import ChatIcon from '@mui/icons-material/Chat';
+import api from '@/utils/axios';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface CommentSectionProps {
     comments: { nickname: string; date: string; text: string; local: boolean }[];
-    // 필요한 props 추가 가능
+    placeId: number | null;
 }
 
 type TabType = 'all' | 'traveler' | 'local';
 
-const CommentSection = ({ comments }: CommentSectionProps) => {
+interface SummaryData {
+    summary: string;
+}
+
+const CommentSection = ({ comments, placeId }: CommentSectionProps) => {
     const [activeTab, setActiveTab] = useState<TabType>('all');
+    const [showSummaryModal, setShowSummaryModal] = useState(false);
+    const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
+    const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+    
+    // 장소 ID가 변경되면 모달 닫기
+    useEffect(() => {
+        setShowSummaryModal(false);
+        setSummaryData(null);
+    }, [placeId]);
+    
+    // AI 요약 가져오기
+    const fetchSummary = async () => {
+        if (!placeId) return;
+        
+        setIsLoadingSummary(true);
+        try {
+            const res = await api.get(`/v1/comments/${placeId}/summary`);
+            
+            if (res.status === 200 && res.data) {
+                // 타입 단언을 통해 res.data의 구조를 명시
+                const data = res.data as { data: { summary?: string; localSummary?: string } };
+                console.log(data);
+                
+                setSummaryData({
+                    summary: data.data.summary || '요약된 내용이 없습니다.',
+                });
+            }
+        } catch (error) {
+            console.error('후기 요약 로드 실패:', error);
+            setSummaryData({
+                summary: '요약을 불러오는 중 오류가 발생했습니다.',
+            });
+        } finally {
+            setIsLoadingSummary(false);
+        }
+    };
+    
+    // AI 요약 모달 열기
+    const handleOpenSummary = () => {
+        setShowSummaryModal(true);
+        fetchSummary();
+    };
     
     // 현재 탭에 따라 댓글 필터링
     const filteredComments = comments.filter(comment => {
@@ -48,12 +96,38 @@ const CommentSection = ({ comments }: CommentSectionProps) => {
                             현지인
                         </CommentTab>
                     </CommentTabs>
-                    <AiSummaryContainer>
+                    <AiSummaryContainer 
+                        onClick={comments.length > 0 ? handleOpenSummary : undefined}
+                        disabled={comments.length === 0}
+                    >
                         <img src="/icons/robot.svg" alt="AI 후기요약" />
                         <AiSummaryText>AI 후기요약</AiSummaryText>
                     </AiSummaryContainer>
                 </TabContainer>
             </CommentHeader>
+            
+            {/* AI 요약 모달 - 인라인으로 표시 */}
+            {showSummaryModal && (
+                <SummarySection>
+                    <SummaryHeader>
+                        <SummaryTitle>
+                            <img src="/icons/robot.svg" alt="AI" /> 
+                            AI가 전체적인 후기를 요약했어요!
+                        </SummaryTitle>
+                        <CloseButton onClick={() => setShowSummaryModal(false)}>
+                            <CloseIcon fontSize="small" />
+                        </CloseButton>
+                    </SummaryHeader>                 
+                    <SummaryContent>
+                        {isLoadingSummary ? (
+                            <LoadingText>요약 내용을 불러오는 중입니다...</LoadingText>
+                        ) : (
+                            summaryData ? summaryData.summary : '요약 정보가 없습니다.'
+                        )}
+                    </SummaryContent>
+                </SummarySection>
+            )}
+            
             <CommentList>
                 {filteredComments.length > 0 ? (
                     filteredComments.map((comment, i) => (
@@ -108,11 +182,12 @@ const TabContainer = styled.div`
   align-items: center;
 `;
 
-const AiSummaryContainer = styled.div`
+const AiSummaryContainer = styled.div<{ disabled: boolean }>`
   display: flex;
   gap: 4px;
   align-items: flex-end;
-  cursor: pointer;
+  cursor: ${props => props.disabled ? 'default' : 'pointer'};
+  opacity: ${props => props.disabled ? 0.5 : 1};
 `;
 
 const AiSummaryText = styled.div`
@@ -200,6 +275,62 @@ const EmptyCommentsMessage = styled.div`
   padding: 20px;
   color: #9A9A9A;
   font-size: 12px;
+`;
+
+// 인라인 요약 섹션 스타일
+const SummarySection = styled.div`
+  background: #F9F9F9;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #EEEEEE;
+`;
+
+const SummaryHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+`;
+
+const SummaryTitle = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #90a4c8;
+  font-weight: 600;
+  img {
+    width: 20px;
+    height: 20px;
+    margin-bottom: 4px;
+  }
+`;
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9A9A9A;
+  padding: 0;
+`;
+
+const SummaryContent = styled.div`
+  font-size: 12px;
+  line-height: 1.5;
+  color: #333;
+  white-space: pre-wrap;
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #EEEEEE;
+`;
+
+const LoadingText = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 60px;
+  color: #9A9A9A;
 `;
 
 export default CommentSection;

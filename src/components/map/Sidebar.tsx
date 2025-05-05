@@ -498,7 +498,10 @@ const Sidebar = ({
               </EmotionContainer>
               <Divider />
               {/* 댓글 리스트 */}
-              <CommentSection comments={comments} />
+              <CommentSection
+                placeId={selectedPlaceId || planId}
+                comments={comments} 
+                />
             </>
           </PlaceInfo>
         ) : (
