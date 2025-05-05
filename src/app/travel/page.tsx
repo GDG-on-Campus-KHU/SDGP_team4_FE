@@ -230,7 +230,7 @@ const TravelPage = () => {
                                                         padding: 0,
                                                         display: 'flex',
                                                         flexDirection: 'column',
-                                                        justifyContent: 'flex-end',
+                                                        justifyContent: 'space-between',
                                                         alignItems: 'flex-start',
                                                         '&:last-child': {
                                                             paddingBottom: 0,
@@ -254,7 +254,7 @@ const TravelPage = () => {
                                                         </div>
                                                         <Typography fontSize={12} ml={0.5}>{card.nickname || '익명'}</Typography>
                                                     </AuthorInfo>
-                                                    <Typography fontSize={18} fontWeight="500" color="black" mt={1.5} mb={0.5}>{card.title || '부산광역시'}</Typography>
+                                                    <Typography fontSize={20} fontWeight="500" color="black" mt={2}>{card.title || '부산광역시'}</Typography>
                                                     <Typography fontSize={12} color="#8C8C8C" mt={0.5} >
                                                         📅 작성일: {card.date}
                                                     </Typography>
@@ -362,7 +362,6 @@ const CardContainer = styled(Box)`
   gap: 24px;
   justify-items: center; // 카드 중앙 정렬
   margin-top: 36px;
-
   @media (max-width: 1024px) {
     grid-template-columns: repeat(2, 1fr); // 태블릿 이하에서는 2개
   }
@@ -384,6 +383,7 @@ const Divider = styled.span`
 
 const StyledCard = styled(Card)`
   width: 330px;
+  height: 134px;
   position: relative;
   border-radius: 10px;
   display: flex;

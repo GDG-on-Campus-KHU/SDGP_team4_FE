@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Button, Avatar, Tabs, Tab, IconButton, Card, CardContent, CardMedia, CircularProgress } from '@mui/material';
+import { Box, Typography, Button, Avatar, Tabs, Tab, IconButton, Card, CardContent, CardMedia, CircularProgress, Pagination, Stack } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PersonIcon from '@mui/icons-material/Person';
 import styled from '@emotion/styled';
@@ -110,7 +110,16 @@ export default function MyPage() {
   const [userInfo, setUserInfo] = useState<UserInfo>({ nickname: '', region: '' });
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+
+  // 페이지네이션 상태 추가
+  const [travelPage, setTravelPage] = useState(1);
+  const [myPostPage, setMyPostPage] = useState(1);
+  const [savedPostPage, setSavedPostPage] = useState(1);
+  const [travelTotalPages, setTravelTotalPages] = useState(1);
+  const [myPostTotalPages, setMyPostTotalPages] = useState(1);
+  const [savedPostTotalPages, setSavedPostTotalPages] = useState(1);
+  const itemsPerPage = 9;
+
   // Dialog 상태 관리
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [openUnsaveDialog, setOpenUnsaveDialog] = useState(false);
@@ -135,82 +144,107 @@ export default function MyPage() {
     }
   };
 
-  // 여행 일정 데이터 fetch
-  const fetchTravels = async () => {
+  // 여행 일정 데이터 fetch - 페이지네이션 적용
+  const fetchTravels = async (page = 0) => {
     setLoading(true);
     try {
-      const { data } = await api.get<TravelResponse>('/v1/member/travel?page=0&size=10');
+      const { data } = await api.get<TravelResponse>(`/v1/member/travel?page=${page}&size=${itemsPerPage}`);
 
-      if (data?.data?.content) {
+      if (data?.data) {
         console.log("여행 계획:", data.data.content);
         setTravels(data.data.content);
+        setTravelTotalPages(data.data.totalPages || 1);
       } else {
         console.error('Unexpected API response structure:', data);
         setTravels([]);
+        setTravelTotalPages(1);
       }
     } catch (error) {
       console.error('Error fetching travels:', error);
       setTravels([]);
+      setTravelTotalPages(1);
     } finally {
       setLoading(false);
     }
   };
 
-  // 내가 작성한 여행 일지 fetch
-  const fetchMyPosts = async () => {
+  // 내가 작성한 여행 일지 fetch - 페이지네이션 적용
+  const fetchMyPosts = async (page = 0) => {
     setLoading(true);
     try {
-      const { data } = await api.get<PostResponse>('/v1/member/post');
+      const { data } = await api.get<PostResponse>(`/v1/member/post?page=${page}&size=${itemsPerPage}`);
 
-      if (data?.data?.content) {
+      if (data?.data) {
         console.log("내 여행 일지:", data.data.content);
         setMyPosts(data.data.content);
+        setMyPostTotalPages(data.data.totalPages || 1);
       } else {
         setMyPosts([]);
+        setMyPostTotalPages(1);
       }
     } catch (error) {
       console.error('Error fetching my posts:', error);
       setMyPosts([]);
+      setMyPostTotalPages(1);
     } finally {
       setLoading(false);
     }
   };
 
-  // 내가 저장한 여행 일지 fetch
-  const fetchSavedPosts = async () => {
+  // 내가 저장한 여행 일지 fetch - 페이지네이션 적용
+  const fetchSavedPosts = async (page = 0) => {
     setLoading(true);
     try {
-      const { data } = await api.get<PostResponse>('/v1/member/post?isLike=true');
+      const { data } = await api.get<PostResponse>(`/v1/member/post?isLike=true&page=${page}&size=${itemsPerPage}`);
 
-      if (data?.data?.content) {
+      if (data?.data) {
         console.log("저장한 여행:", data.data.content);
         setSavedPosts(data.data.content);
+        setSavedPostTotalPages(data.data.totalPages || 1);
       } else {
         setSavedPosts([]);
+        setSavedPostTotalPages(1);
       }
     } catch (error) {
       console.error('Error fetching saved posts:', error);
       setSavedPosts([]);
+      setSavedPostTotalPages(1);
     } finally {
       setLoading(false);
     }
+  };
+
+  // 페이지네이션 핸들러 추가
+  const handleTravelPageChange = (_: React.ChangeEvent<unknown>, page: number) => {
+    setTravelPage(page);
+    fetchTravels(page - 1); // API는 0-based, UI는 1-based
+  };
+
+  const handleMyPostPageChange = (_: React.ChangeEvent<unknown>, page: number) => {
+    setMyPostPage(page);
+    fetchMyPosts(page - 1);
+  };
+
+  const handleSavedPostPageChange = (_: React.ChangeEvent<unknown>, page: number) => {
+    setSavedPostPage(page);
+    fetchSavedPosts(page - 1);
   };
 
   // 탭 변경 시 데이터 로드
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
     if (newValue === 0 && travels.length === 0) {
-      fetchTravels();
+      fetchTravels(travelPage - 1);
     } else if (newValue === 1 && myPosts.length === 0) {
-      fetchMyPosts();
+      fetchMyPosts(myPostPage - 1);
     } else if (newValue === 2 && savedPosts.length === 0) {
-      fetchSavedPosts();
+      fetchSavedPosts(savedPostPage - 1);
     }
   };
 
   useEffect(() => {
     fetchUserInfo();
-    fetchTravels(); // 기본 탭은 여행 계획이므로 여행 계획 데이터를 로드
+    fetchTravels(0); // 기본 탭은 여행 계획이므로 여행 계획 데이터를 로드
   }, []);
 
   // HTML 태그 제거하는 함수
@@ -263,11 +297,19 @@ export default function MyPage() {
   // 확인 후 삭제 처리
   const confirmDeleteTravel = async () => {
     if (selectedTravelId === null) return;
-    
+
     try {
       await api.delete(`/v1/travel/${selectedTravelId}`);
       setTravels((prev) => prev.filter((t) => t.travelId !== selectedTravelId));
       setOpenDeleteDialog(false);
+
+      // 현재 페이지의 항목이 모두 삭제되었을 경우, 이전 페이지로 이동
+      if (travels.length === 1 && travelPage > 1) {
+        setTravelPage(prev => prev - 1);
+        fetchTravels(travelPage - 2);
+      } else {
+        fetchTravels(travelPage - 1);
+      }
     } catch (error) {
       setErrorMessage('삭제에 실패했습니다.');
       setOpenErrorDialog(true);
@@ -284,11 +326,19 @@ export default function MyPage() {
   // 확인 후 저장 취소 처리
   const confirmUnsavePost = async () => {
     if (selectedPostId === null) return;
-    
+
     try {
       await api.post(`/v1/post/${selectedPostId}`);
       setSavedPosts((prev) => prev.filter((p) => p.postId !== selectedPostId));
       setOpenUnsaveDialog(false);
+
+      // 현재 페이지의 항목이 모두 삭제되었을 경우, 이전 페이지로 이동
+      if (savedPosts.length === 1 && savedPostPage > 1) {
+        setSavedPostPage(prev => prev - 1);
+        fetchSavedPosts(savedPostPage - 2);
+      } else {
+        fetchSavedPosts(savedPostPage - 1);
+      }
     } catch (error) {
       setErrorMessage('저장 취소에 실패했습니다.');
       setOpenErrorDialog(true);
@@ -326,7 +376,7 @@ export default function MyPage() {
             padding: 0,
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
             alignItems: 'flex-start',
             '&:last-child': {
               paddingBottom: 0,
@@ -350,13 +400,67 @@ export default function MyPage() {
             </div>
             <Typography fontSize={12} ml={0.5}>{post.nickname || '익명'}</Typography>
           </AuthorInfo>
-          <Typography fontSize={18} fontWeight="500" color="black" mt={1.5} mb={0.5}>{post.title || '부산광역시'}</Typography>
+          <Typography fontSize={20} fontWeight="500" color="black" mt={2}>{post.title || '부산광역시'}</Typography>
           <Typography fontSize={12} color="#8C8C8C" mt={0.5} >
             📅 작성일: {post.date}
           </Typography>
         </CardContent>
       </StyledCard>
     );
+  };
+
+  // 현재 활성 탭에 대한 페이지네이션 렌더링
+  const renderPagination = () => {
+    if (loading) return null;
+
+    if (activeTab === 0) {
+      return (
+        <PaginationContainer>
+          <Pagination
+            sx={{
+              '& .MuiPaginationItem-root': {
+                color: '#C1C1C1',
+                borderColor: '#C1C1C1',
+              },
+            }}
+            count={travelTotalPages}
+            page={travelPage}
+            onChange={handleTravelPageChange}
+          />
+        </PaginationContainer>
+
+      );
+    } else if (activeTab === 1) {
+      return (
+        <PaginationContainer>
+          <Pagination
+            sx={{
+              '& .MuiPaginationItem-root': {
+                color: '#C1C1C1',
+                borderColor: '#C1C1C1',
+              },
+            }}
+            count={myPostTotalPages}
+            page={myPostPage}
+            onChange={handleMyPostPageChange}
+
+          />
+        </PaginationContainer>
+      );
+    } else if (activeTab === 2) {
+      return (
+        <PaginationContainer>
+          <Pagination
+            count={savedPostTotalPages}
+            page={savedPostPage}
+            onChange={handleSavedPostPageChange}
+            color="primary"
+            showFirstButton
+            showLastButton
+          />
+        </PaginationContainer>
+      );
+    }
   };
 
   // 활성 탭에 따른 콘텐츠 렌더링
@@ -376,69 +480,72 @@ export default function MyPage() {
         );
       }
       return (
-        <CardContainer>
-          {travels.map((trip) => (
-            <StyledCard
-              key={trip.travelId}
-              onClick={() => router.push(`/my/${trip.travelId}`)}
-              sx={{ cursor: 'pointer' }}
-            >
-              {trip.thumbnail && (
-                <CardMedia
-                  component="img"
-                  image={trip.thumbnail}
-                  alt={trip.title}
-                  sx={{
-                    width: "100px",
-                    height: "100px",
-                    borderRadius: "5px",
-                    backgroundColor: '#f5f5f5',
-                    objectFit: 'cover',
-                    marginRight: "16px"
-                  }}
-                />
-              )}
-              <CardContent sx={{
-                padding: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'flex-end',
-                alignItems: 'flex-start',
-                '&:last-child': {
-                  paddingBottom: 0,
-                },
-              }}>
-                <DdayBadge>{calculateDday(trip.startDate)}</DdayBadge>
-                <Typography
-                  fontSize={18}
-                  fontWeight="500"
-                  color="black"
-                >
-                  {trip.area}
-                </Typography>
-                <Typography
-                  fontSize={14}
-                  sx={{
-                    color: trip.title ? '#585858' : '#9A9A9A',
-                  }}
-                >
-                  {trip.title ? trip.title : '여행 일지를 작성해보세요!'}
-                </Typography>
-                <Typography fontSize={12} color="#8C8C8C" mt={1}>
-                  📅 {formatDateRange(trip.startDate, trip.endDate)}
-                </Typography>
-                <DeleteButton
-                  onClick={e => {
-                    e.stopPropagation();
-                    handleDeleteTravel(trip.travelId);
-                  }}
-                >
-                  <img src="/icons/trash.svg" alt="delete" />
-                </DeleteButton>
-              </CardContent>
-            </StyledCard>
-          ))}
-        </CardContainer>
+        <>
+          <CardContainer>
+            {travels.map((trip) => (
+              <StyledCard
+                key={trip.travelId}
+                onClick={() => router.push(`/my/${trip.travelId}`)}
+                sx={{ cursor: 'pointer' }}
+              >
+                {trip.thumbnail && (
+                  <CardMedia
+                    component="img"
+                    image={trip.thumbnail}
+                    alt={trip.title}
+                    sx={{
+                      width: "100px",
+                      height: "100px",
+                      borderRadius: "5px",
+                      backgroundColor: '#f5f5f5',
+                      objectFit: 'cover',
+                      marginRight: "16px"
+                    }}
+                  />
+                )}
+                <CardContent sx={{
+                  padding: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'flex-end',
+                  alignItems: 'flex-start',
+                  '&:last-child': {
+                    paddingBottom: 0,
+                  },
+                }}>
+                  <DdayBadge>{calculateDday(trip.startDate)}</DdayBadge>
+                  <Typography
+                    fontSize={18}
+                    fontWeight="500"
+                    color="black"
+                  >
+                    {trip.area}
+                  </Typography>
+                  <Typography
+                    fontSize={14}
+                    sx={{
+                      color: trip.title ? '#585858' : '#9A9A9A',
+                    }}
+                  >
+                    {trip.title ? trip.title : '여행 일지를 작성해보세요!'}
+                  </Typography>
+                  <Typography fontSize={12} color="#8C8C8C" mt={1}>
+                    📅 {formatDateRange(trip.startDate, trip.endDate)}
+                  </Typography>
+                  <DeleteButton
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleDeleteTravel(trip.travelId);
+                    }}
+                  >
+                    <img src="/icons/trash.svg" alt="delete" />
+                  </DeleteButton>
+                </CardContent>
+              </StyledCard>
+            ))}
+          </CardContainer>
+          {renderPagination()}
+        </>
       );
     }
 
@@ -449,9 +556,12 @@ export default function MyPage() {
         );
       }
       return (
-        <CardContainer>
-          {myPosts.map(post => renderPostCard(post))}
-        </CardContainer>
+        <>
+          <CardContainer>
+            {myPosts.map(post => renderPostCard(post))}
+          </CardContainer>
+          {renderPagination()}
+        </>
       );
     }
 
@@ -462,9 +572,12 @@ export default function MyPage() {
         );
       }
       return (
-        <CardContainer>
-          {savedPosts.map(post => renderPostCard(post, true))}
-        </CardContainer>
+        <>
+          <CardContainer>
+            {savedPosts.map(post => renderPostCard(post, true))}
+          </CardContainer>
+          {renderPagination()}
+        </>
       );
     }
   };
@@ -587,6 +700,7 @@ const CardContainer = styled(Box)`
 
 const StyledCard = styled(Card)`
   width: 330px;
+  height: 134px;
   position: relative;
   border-radius: 10px;
   display: flex;
@@ -627,4 +741,11 @@ const EmptyMessage = styled(Box)`
 const AuthorInfo = styled(Box)`
   display: flex;
   align-items: center;
+`;
+
+const PaginationContainer = styled(Box)`
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+  margin-bottom: 20px;
 `;
