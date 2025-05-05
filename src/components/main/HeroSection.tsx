@@ -3,13 +3,30 @@ import { motion } from "framer-motion";
 import { Button } from "@mui/material";
 import styled from "styled-components";
 import Link from 'next/link';
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export const HeroSection = () => {
   const featureSectionRef = useRef<HTMLDivElement>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    // 로컬 스토리지에서 토큰 확인
+    const token = localStorage.getItem('accessToken');
+    setIsLoggedIn(!!token);
+  }, []);
 
   const scrollToFeature = () => {
     featureSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleStartClick = () => {
+    if (isLoggedIn) {
+      router.push('/map');
+    } else {
+      router.push('/signin');
+    }
   };
 
   return (
@@ -54,19 +71,18 @@ export const HeroSection = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
-              <Link href="/map">
-                <Button
-                  variant="contained"
-                  color="primary"
-                  sx={{
-                    width: "120px",
-                    height: "45px",
-                    fontSize: "16px",
-                  }}
-                >
-                  시작하기
-                </Button>
-              </Link>
+              <Button
+                onClick={handleStartClick}
+                variant="contained"
+                color="primary"
+                sx={{
+                  width: "120px",
+                  height: "45px",
+                  fontSize: "16px",
+                }}
+              >
+                시작하기
+              </Button>
               <Button
                 variant="outlined"
                 color="primary"

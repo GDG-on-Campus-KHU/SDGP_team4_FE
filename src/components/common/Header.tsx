@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import styled from '@emotion/styled';
 import { Button } from '@mui/material';
@@ -59,9 +59,25 @@ const NavLink = styled(Link, {
   }
 `;
 
+// 스타일이 같은 커스텀 버튼 링크 컴포넌트 추가
+const NavButton = styled.button<StyledLinkProps>`
+  font-size: 14px;
+  color: ${props => props.active ? '#90a4c8' : '#9A9A9A'};
+  text-decoration: none;
+  font-weight: ${props => props.active ? 'bold' : 'normal'};
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  &:hover {
+    color: #90a4c8;
+  }
+`;
+
 export default function Header() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     // 로컬 스토리지에서 토큰 확인
@@ -84,6 +100,16 @@ export default function Header() {
     }
   };
 
+  // 보호된 경로를 처리하는 함수
+  const handleProtectedRoute = (e: React.MouseEvent, path: string) => {
+    if (!isLoggedIn) {
+      e.preventDefault();
+      router.push('/signin');
+    } else {
+      router.push(path);
+    }
+  };
+
   return (
     <HeaderWrapper>
       <NavLink href="/" active={pathname === '/'}>
@@ -93,9 +119,24 @@ export default function Header() {
         </LogoSection>
       </NavLink>
       <NavMenu>
-        <NavLink href="/map" active={pathname === '/map'}>지도</NavLink>
-        <NavLink href="/travel" active={pathname.startsWith('/travel')}>여행일지</NavLink>
-        <NavLink href="/my" active={pathname.startsWith('/my')}>MY</NavLink>
+        <NavButton 
+          active={pathname === '/map'} 
+          onClick={(e) => handleProtectedRoute(e, '/map')}
+        >
+          지도
+        </NavButton>
+        <NavButton 
+          active={pathname.startsWith('/travel')} 
+          onClick={(e) => handleProtectedRoute(e, '/travel')}
+        >
+          여행일지
+        </NavButton>
+        <NavButton 
+          active={pathname.startsWith('/my')} 
+          onClick={(e) => handleProtectedRoute(e, '/my')}
+        >
+          MY
+        </NavButton>
         <Button
           onClick={handleAuthClick}
           variant={isLoggedIn ? "outlined" : "contained"}

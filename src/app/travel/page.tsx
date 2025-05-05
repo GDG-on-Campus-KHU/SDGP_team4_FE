@@ -22,7 +22,7 @@ const TravelPage = () => {
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortType, setSortType] = useState<'latest' | 'popular' | null>(null);
-    
+
 
     // description에서 첫 번째 이미지 URL 추출하는 함수
     const extractImageUrl = (description: string) => {
@@ -52,7 +52,7 @@ const TravelPage = () => {
     // 정렬 함수
     const sortPosts = (posts: any[]) => {
         const sorted = [...posts];
-        
+
         if (sortType === 'latest') {
             // 날짜 기준 정렬 (최신순)
             return sorted.sort((a, b) => {
@@ -68,10 +68,10 @@ const TravelPage = () => {
                 return likesB - likesA; // 내림차순
             });
         }
-        
+
         return sorted;
     };
-    
+
     // 정렬 변경 핸들러
     const handleSortChange = (type: 'latest' | 'popular') => {
         // 이미 선택된 정렬 방식을 다시 클릭하면 정렬 해제
@@ -84,23 +84,23 @@ const TravelPage = () => {
             setFilteredPosts(sortPosts(posts));
             return;
         }
-        
+
         // 검색어를 포함하는 게시물만 필터링
         const filtered = posts.filter(post => {
             // title에서 검색
             if (post.title && post.title.toLowerCase().includes(searchTerm.toLowerCase())) {
                 return true;
             }
-            
+
             // description에서 검색 (HTML 태그 제거 후)
             if (post.description) {
                 const plainText = stripHtmlTags(post.description).toLowerCase();
                 return plainText.includes(searchTerm.toLowerCase());
             }
-            
+
             return false;
         });
-        
+
         // 필터링 후 정렬 적용
         setFilteredPosts(sortPosts(filtered));
     };
@@ -164,8 +164,8 @@ const TravelPage = () => {
         <Wrapper>
             <ContentWrapper>
                 <SearchSection>
-                    <SearchInput 
-                        placeholder="지역을 검색해보세요!" 
+                    <SearchInput
+                        placeholder="지역을 검색해보세요!"
                         value={searchTerm}
                         onChange={handleSearchChange}
                         onKeyDown={handleKeyDown}
@@ -174,28 +174,28 @@ const TravelPage = () => {
                         <SearchIcon sx={{ fontSize: '28px' }} />
                     </SearchIconWrapper>
                 </SearchSection>
+                <SortTabs>
+                    <SortButton
+                        active={sortType === 'latest'}
+                        onClick={() => handleSortChange('latest')}
+                    >
+                        최신순
+                    </SortButton>
+                    <Divider>|</Divider>
+                    <SortButton
+                        active={sortType === 'popular'}
+                        onClick={() => handleSortChange('popular')}
+                    >
+                        인기순
+                    </SortButton>
+                </SortTabs>
                 {loading ? (
                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', width: '100%' }}>
                         <CircularProgress />
                     </div>
                 ) : (
                     <>
-                        <div style={{ marginTop: '50px'}}>
-                            <SortTabs>
-                                <SortButton 
-                                    active={sortType === 'latest'} 
-                                    onClick={() => handleSortChange('latest')}
-                                >
-                                    최신순
-                                </SortButton>
-                                <Divider>|</Divider>
-                                <SortButton 
-                                    active={sortType === 'popular'} 
-                                    onClick={() => handleSortChange('popular')}
-                                >
-                                    인기순
-                                </SortButton>
-                            </SortTabs>
+                        <div style={{ marginTop: '50px' }}>
                             {error ? (
                                 <div style={{ color: 'red' }}>에러: {error}</div>
                             ) : filteredPosts.length === 0 ? (
@@ -361,7 +361,7 @@ const CardContainer = styled(Box)`
   grid-template-columns: repeat(3, 1fr); // 한 줄에 3개
   gap: 24px;
   justify-items: center; // 카드 중앙 정렬
-  margin-top: 36px;
+
   @media (max-width: 1024px) {
     grid-template-columns: repeat(2, 1fr); // 태블릿 이하에서는 2개
   }
