@@ -29,6 +29,7 @@ export default function SignInPage() {
         password: '',
     });
     const [error, setError] = useState<string>('');
+    const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -40,10 +41,10 @@ export default function SignInPage() {
 
     const handleSignIn = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsSubmitted(true);
         setError('');
 
         if (!formData.nickname || !formData.password) {
-            setError('모든 필드를 입력해주세요.');
             return;
         }
 
@@ -112,7 +113,11 @@ export default function SignInPage() {
                         fullWidth
                     />
                 </div>
-                {error && <ErrorMessage>{error}</ErrorMessage>}
+                {isSubmitted && (
+                    (!formData.nickname || !formData.password) ? 
+                    <ErrorMessage>모든 필드를 입력해주세요.</ErrorMessage> : 
+                    (error && <ErrorMessage>아이디 또는 비밀번호가 일치하지 않습니다.</ErrorMessage>)
+                )}
                 <LoginButton 
                     type="submit"
                     fullWidth 
