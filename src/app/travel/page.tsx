@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import styled from '@emotion/styled';
 import api from '@/utils/axios';
 import CircularProgress from '@mui/material/CircularProgress';
+import PersonIcon from '@mui/icons-material/Person';
 
 const TravelPage = () => {
     const itemsPerPage = 9;
@@ -15,12 +16,98 @@ const TravelPage = () => {
     const router = useRouter();
     const [bookmarked, setBookmarked] = useState<boolean[]>([]);
     const [posts, setPosts] = useState<any[]>([]);
+    const [filteredPosts, setFilteredPosts] = useState<any[]>([]);
     const [totalCount, setTotalCount] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortType, setSortType] = useState<'latest' | 'popular' | null>(null);
+
+    // description에서 첫 번째 이미지 URL 추출하는 함수
+    const extractImageUrl = (description: string) => {
+        if (!description) return null;
+
+        // img 태그에서 src 속성 추출을 위한 정규식
+        const imgRegex = /<img[^>]+src="([^">]+)"/i;
+        const match = description.match(imgRegex);
+
+        return match ? match[1] : null;
+    };
+
+    // HTML 태그 제거하는 함수
+    const stripHtmlTags = (html: string) => {
+        if (!html) return '';
+        return html.replace(/<[^>]*>/g, '');
+    };
 
     const handlePageChange = (_: React.ChangeEvent<unknown>, value: number) => {
         setPage(value);
+    };
+
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchTerm(e.target.value);
+    };
+
+    // 정렬 함수
+    const sortPosts = (posts: any[]) => {
+        const sorted = [...posts];
+        
+        if (sortType === 'latest') {
+            // 날짜 기준 정렬 (최신순)
+            return sorted.sort((a, b) => {
+                const dateA = new Date(a.date || '').getTime();
+                const dateB = new Date(b.date || '').getTime();
+                return dateB - dateA; // 내림차순
+            });
+        } else if (sortType === 'popular') {
+            // 좋아요 수 기준 정렬 (인기순)
+            return sorted.sort((a, b) => {
+                const likesA = a.likeCount || 0;
+                const likesB = b.likeCount || 0;
+                return likesB - likesA; // 내림차순
+            });
+        }
+        
+        return sorted;
+    };
+    
+    // 정렬 변경 핸들러
+    const handleSortChange = (type: 'latest' | 'popular') => {
+        // 이미 선택된 정렬 방식을 다시 클릭하면 정렬 해제
+        setSortType(prev => prev === type ? null : type);
+    };
+
+    const handleSearch = () => {
+        if (!searchTerm.trim()) {
+            // 검색어가 없으면 모든 게시물 표시 (정렬 적용)
+            setFilteredPosts(sortPosts(posts));
+            return;
+        }
+        
+        // 검색어를 포함하는 게시물만 필터링
+        const filtered = posts.filter(post => {
+            // title에서 검색
+            if (post.title && post.title.toLowerCase().includes(searchTerm.toLowerCase())) {
+                return true;
+            }
+            
+            // description에서 검색 (HTML 태그 제거 후)
+            if (post.description) {
+                const plainText = stripHtmlTags(post.description).toLowerCase();
+                return plainText.includes(searchTerm.toLowerCase());
+            }
+            
+            return false;
+        });
+        
+        // 필터링 후 정렬 적용
+        setFilteredPosts(sortPosts(filtered));
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        }
     };
 
     const handleBookmarkClick = async (idx: number, postId: number) => {
@@ -47,6 +134,7 @@ const TravelPage = () => {
                 // 서버 응답 구조에 맞게 변환 (필요시 매핑)
                 const content = data.data?.content || data.content || [];
                 setPosts(content);
+                setFilteredPosts(sortPosts(content)); // 정렬 적용
                 setTotalCount(data.data?.totalElements || data.totalElements || 0);
                 setBookmarked(content.map((p: any) => p.isMyLike));
             } catch (e: any) {
@@ -56,7 +144,16 @@ const TravelPage = () => {
             }
         };
         fetchPosts();
-    }, [page]);
+    }, [page]); // sortType은 의존성에서 제외
+
+    // 검색어나 정렬 타입이 변경될 때 결과 업데이트
+    useEffect(() => {
+        if (searchTerm === '') {
+            setFilteredPosts(sortPosts(posts)); // 정렬만 적용
+        } else {
+            handleSearch(); // 검색 및 정렬 적용
+        }
+    }, [sortType, posts]);
 
     useEffect(() => {
         console.log("posts:", posts);
@@ -66,9 +163,14 @@ const TravelPage = () => {
         <Wrapper>
             <ContentWrapper>
                 <SearchSection>
-                    <SearchInput placeholder="지역을 검색해보세요!" />
-                    <SearchIconWrapper>
-                        <SearchIcon sx={{fontSize: '28px'}}/>
+                    <SearchInput 
+                        placeholder="지역을 검색해보세요!" 
+                        value={searchTerm}
+                        onChange={handleSearchChange}
+                        onKeyDown={handleKeyDown}
+                    />
+                    <SearchIconWrapper onClick={handleSearch}>
+                        <SearchIcon sx={{ fontSize: '28px' }} />
                     </SearchIconWrapper>
                 </SearchSection>
                 {loading ? (
@@ -76,99 +178,131 @@ const TravelPage = () => {
                         <CircularProgress />
                     </div>
                 ) : (
-                <>
-                <div style={{ marginTop: '50px' }}>
-                    <SortTabs>
-                        <Typography variant="body2" fontWeight={600}>최신순</Typography>
-                        <Divider>|</Divider>
-                        <Typography variant="body2">인기순</Typography>
-                    </SortTabs>
-                    {error ? (
-                        <div style={{ color: 'red' }}>에러: {error}</div>
-                    ) : (
-                    <CardContainer>
-                        {posts.map((card, idx) => {
-                            return (
-                                <StyledCard key={card.postId} onClick={() => router.push(`/travel/${card.postId}`)}>
-                                    {/* <CardMedia
-                                        component="img"
-                                        image={card.thumbnail || '/page.png'}
-                                        alt={card.title}
-                                        sx={{
-                                            width: "120px",
-                                            borderRadius: "5px",
-                                            backgroundColor: '#f5f5f5',
-                                            objectFit: 'cover',
-                                            marginRight: "16px"
-                                        }}
-                                    /> */}
-                                    <CardContent
-                                        sx={{
-                                            padding: 0,
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            justifyContent: 'flex-end',
-                                            alignItems: 'flex-start',
-                                            '&:last-child': {
-                                                paddingBottom: 0,
-                                            },
-                                        }}
-                                    >
-                                        <AuthorInfo>
-                                            <Avatar src={card.avatar || '/sample-avatar.jpg'} sx={{ width: 24, height: 24 }} />
-                                            <Typography fontSize={12} ml={0.5}>{card.author || '익명'}</Typography>
-                                        </AuthorInfo>
-                                        <Typography fontSize={18} fontWeight="500" color="black" mt={1.5}>{card.region || '부산광역시'}</Typography>
-                                        <Typography fontSize={14} color='#585858'>{card.title}</Typography>
-                                        <Typography fontSize={12} color="#8C8C8C" mt={0.5} >
-                                            📅 {card.dateRange || '2025-03-25 ~ 2025-03-27'}
-                                        </Typography>
-                                    </CardContent>
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            top: '1rem',
-                                            right: '1rem',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '4px'
-                                        }}
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            handleBookmarkClick(idx, card.postId);
-                                        }}
-                                    >
-                                        <div style={{
-                                            fontSize: '12px',
-                                            color: '#333'
-                                        }}>{card.likeCount ?? 0}</div>
-                                        {card.isMyLike ? (
-                                            <BookmarkIcon sx={{ color: 'black' }} />
-                                        ) : (
-                                            <BookmarkBorderIcon sx={{ color: 'black' }} />
-                                        )}
-                                    </div>
-                                </StyledCard>
-                            );
-                        })}
-                    </CardContainer>
-                    )}
-                </div>
-                <PaginationWrapper>
-                    <Pagination
-                        sx={{
-                            '& .MuiPaginationItem-root': {
-                                color: '#C1C1C1',
-                                borderColor: '#C1C1C1',
-                            },
-                        }}
-                        count={Math.ceil(totalCount / itemsPerPage)}
-                        page={page}
-                        onChange={handlePageChange}
-                    />
-                </PaginationWrapper>
-                </>
+                    <>
+                        <div style={{ marginTop: '50px'}}>
+                            <SortTabs>
+                                <SortButton 
+                                    active={sortType === 'latest'} 
+                                    onClick={() => handleSortChange('latest')}
+                                >
+                                    최신순
+                                </SortButton>
+                                <Divider>|</Divider>
+                                <SortButton 
+                                    active={sortType === 'popular'} 
+                                    onClick={() => handleSortChange('popular')}
+                                >
+                                    인기순
+                                </SortButton>
+                            </SortTabs>
+                            {error ? (
+                                <div style={{ color: 'red' }}>에러: {error}</div>
+                            ) : filteredPosts.length === 0 ? (
+                                <div style={{ textAlign: 'center', margin: '50px 0', color: '#666' }}>
+                                    검색 결과가 없습니다.
+                                </div>
+                            ) : (
+                                <CardContainer>
+                                    {filteredPosts.map((card, idx) => {
+                                        // description에서 이미지 URL 추출 - 기본 이미지 폴백 제거
+                                        const thumbnailUrl = extractImageUrl(card.description) || card.thumbnail || null;
+
+                                        return (
+                                            <StyledCard key={card.postId} onClick={() => router.push(`/travel/${card.postId}`)}>
+                                                {thumbnailUrl && (
+                                                    <CardMedia
+                                                        component="img"
+                                                        image={thumbnailUrl}
+                                                        alt={card.title}
+                                                        sx={{
+                                                            width: "90px",
+                                                            height: "90px",
+                                                            borderRadius: "5px",
+                                                            backgroundColor: '#f5f5f5',
+                                                            objectFit: 'cover',
+                                                            marginRight: "16px"
+                                                        }}
+                                                    />
+                                                )}
+                                                <CardContent
+                                                    sx={{
+                                                        padding: 0,
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        justifyContent: 'flex-end',
+                                                        alignItems: 'flex-start',
+                                                        '&:last-child': {
+                                                            paddingBottom: 0,
+                                                        },
+                                                    }}
+                                                >
+                                                    <AuthorInfo>
+                                                        <div
+                                                            style={{
+                                                                width: 24,
+                                                                height: 24,
+                                                                borderRadius: '50%',
+                                                                backgroundColor: '#DDD',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                marginRight: '4px',
+                                                            }}
+                                                        >
+                                                            <PersonIcon sx={{ fontSize: 20, color: 'white' }} />
+                                                        </div>
+                                                        <Typography fontSize={12} ml={0.5}>{card.nickname || '익명'}</Typography>
+                                                    </AuthorInfo>
+                                                    <Typography fontSize={18} fontWeight="500" color="black" mt={1.5} mb={0.5}>{card.title || '부산광역시'}</Typography>
+                                                    <Typography fontSize={12} color="#8C8C8C" mt={0.5} >
+                                                        📅 작성일: {card.date}
+                                                    </Typography>
+                                                </CardContent>
+                                                <div
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: '1rem',
+                                                        right: '1rem',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        handleBookmarkClick(idx, card.postId);
+                                                    }}
+                                                >
+                                                    <div style={{
+                                                        fontSize: '12px',
+                                                        color: '#333'
+                                                    }}>{card.likeCount ?? 0}</div>
+                                                    {card.isMyLike ? (
+                                                        <BookmarkIcon sx={{ color: 'black' }} />
+                                                    ) : (
+                                                        <BookmarkBorderIcon sx={{ color: 'black' }} />
+                                                    )}
+                                                </div>
+                                            </StyledCard>
+                                        );
+                                    })}
+                                </CardContainer>
+                            )}
+                        </div>
+                        <PaginationWrapper>
+                            <Pagination
+                                sx={{
+                                    '& .MuiPaginationItem-root': {
+                                        color: '#C1C1C1',
+                                        borderColor: '#C1C1C1',
+                                    },
+                                }}
+                                count={Math.ceil(totalCount / itemsPerPage)}
+                                page={page}
+                                onChange={handlePageChange}
+                            />
+                        </PaginationWrapper>
+                    </>
                 )}
             </ContentWrapper>
         </Wrapper>
@@ -206,7 +340,6 @@ const SearchInput = styled('input')`
   font-size: 14px;
   &:focus {
     outline: none;
-    border-color: #aaa;
   }
   &::placeholder {
     color: #898989;
@@ -268,4 +401,19 @@ const PaginationWrapper = styled(Box)`
   margin-top: 40px;
   display: flex;
   justify-content: center;
+`;
+
+// 정렬 버튼 스타일 컴포넌트
+const SortButton = styled.button<{ active: boolean }>`
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: ${props => props.active ? 600 : 400};
+  color: ${props => props.active ? '#000' : '#666'};
+  
+  &:hover {
+    opacity: 0.8;
+  }
 `;

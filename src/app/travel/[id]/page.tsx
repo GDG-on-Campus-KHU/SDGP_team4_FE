@@ -10,7 +10,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
 import CircularProgress from '@mui/material/CircularProgress';
-
+import PersonIcon from '@mui/icons-material/Person';
 const TravelDetailPage = () => {
   const { id } = useParams();
   const [post, setPost] = useState<any>(null);
@@ -68,8 +68,21 @@ const TravelDetailPage = () => {
       <ContentWrapper>
         {/* 작성자 정보 */}
         <UserInfo>
-          <Avatar src={post.avatar || '/sample-avatar.jpg'} />
-          <Typography ml={1} fontWeight={500}>{post.author || '익명'}</Typography>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              backgroundColor: '#DDD',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: '4px',
+            }}
+          >
+            <PersonIcon sx={{ fontSize: 30, color: 'white' }} />
+          </div>
+          <Typography ml={1}>{post.nickname || '익명'}</Typography>
         </UserInfo>
         {/* 제목 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -87,18 +100,9 @@ const TravelDetailPage = () => {
         </div>
         {/* 지역, 날짜 */}
         <LocationDateContainer>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <LocationOnIcon color="secondary" sx={{ fontSize: '24px', marginLeft: '-3px' }} />
-            <Typography fontSize={14}>
-              {post.region || '부산광역시'}
+            <Typography fontSize={14} color="#9A9A9A">
+              작성일: {post.date || '2025-03-25 ~ 2025-03-27'}
             </Typography>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CalendarTodayIcon color="secondary" sx={{ fontSize: '18px' }} />
-            <Typography fontSize={14}>
-              {post.dateRange || '2025-03-25 ~ 2025-03-27'}
-            </Typography>
-          </div>
         </LocationDateContainer>
         <TravelContent>
           <Typography mb={3} component="div" dangerouslySetInnerHTML={{ __html: post.description }} />
@@ -137,7 +141,7 @@ const LocationDateContainer = styled(Box)`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 30px;
+  margin-top: 10px;
 `;
 
 const Wrapper = styled(Box)`
