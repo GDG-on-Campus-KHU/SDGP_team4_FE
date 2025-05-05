@@ -87,7 +87,7 @@ export default function MapPage() {
   const searchAfterMapUpdate = useRef(false);
 
   const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: 'AIzaSyDx01yI23584jz6SnjWsltrVrl0vkQve6U',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
     libraries: ['places', 'geometry'],
     language: 'ko',
   });

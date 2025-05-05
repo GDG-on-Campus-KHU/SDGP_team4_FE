@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Button, Avatar, Tabs, Tab, IconButton, Card, CardContent, CardMedia } from '@mui/material';
+import { Box, Typography, Button, Avatar, Tabs, Tab, IconButton, Card, CardContent, CardMedia, CircularProgress } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PersonIcon from '@mui/icons-material/Person';
 import styled from '@emotion/styled';
@@ -128,6 +128,7 @@ export default function MyPage() {
 
   // 여행 일정 데이터 fetch
   const fetchTravels = async () => {
+    setLoading(true);
     try {
       const { data } = await api.get<TravelResponse>('/v1/member/travel');
 
@@ -141,6 +142,8 @@ export default function MyPage() {
     } catch (error) {
       console.error('Error fetching travels:', error);
       setTravels([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -333,8 +336,8 @@ export default function MyPage() {
   const renderContent = () => {
     if (loading) {
       return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', padding: '50px 0' }}>
-          <Typography>로딩 중...</Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '50px 0' }}>
+          <CircularProgress />
         </Box>
       );
     }
