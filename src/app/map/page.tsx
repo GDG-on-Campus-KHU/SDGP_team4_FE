@@ -14,6 +14,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import api from '@/utils/axios';
 import { useAppSelector, useAppDispatch } from '@/redux/hooks';
 import { setEditingMode, resetTravelInfo } from '@/redux/slices/travelSlice';
+import CustomDialog from '@/components/common/CustomDialog';
 
 const containerStyle = {
   width: '100%',
@@ -843,6 +844,12 @@ export default function MapPage() {
     }
   }, [isLoaded, dayPlans.length, travelInfo.isEditing, travelInfo.travelId]);
 
+  // 필요한 상태 변수들 추가
+  const [openSuccessDialog, setOpenSuccessDialog] = useState(false);
+  const [openErrorDialog, setOpenErrorDialog] = useState(false);
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
   // 저장 및 종료 핸들러 추가
   const handleSaveAndExit = async () => {
     if (!plan || !travelInfo.travelId) return;
@@ -874,25 +881,33 @@ export default function MapPage() {
         courseUpdateDto
       });
       
-      alert('여행 정보가 성공적으로 저장되었습니다.');
-      
-      // Redux 상태 초기화
-      dispatch(resetTravelInfo());
-      
-      // 이전 페이지로 이동
-      window.history.back();
+      // alert 대신 성공 다이얼로그 표시
+      setOpenSuccessDialog(true);
     } catch (error) {
       console.error('여행 정보 저장 실패:', error);
-      alert('여행 정보 저장에 실패했습니다. 다시 시도해주세요.');
+      setErrorMessage('여행 정보 저장에 실패했습니다. 다시 시도해주세요.');
+      setOpenErrorDialog(true);
     }
   };
-  
+
+  // 성공 다이얼로그 확인 핸들러
+  const handleSuccessConfirm = () => {
+    setOpenSuccessDialog(false);
+    dispatch(resetTravelInfo());
+    window.history.back();
+  };
+
   // 취소 핸들러
   const handleCancel = () => {
-    if (confirm('변경 사항을 저장하지 않고 나가시겠습니까?')) {
-      dispatch(resetTravelInfo());
-      window.history.back();
-    }
+    // confirm 대신 확인 다이얼로그 표시
+    setOpenConfirmDialog(true);
+  };
+
+  // 취소 확인 핸들러
+  const handleCancelConfirm = () => {
+    setOpenConfirmDialog(false);
+    dispatch(resetTravelInfo());
+    window.history.back();
   };
 
   // 돌아가기 핸들러 추가
@@ -1080,6 +1095,38 @@ export default function MapPage() {
         initialStartDate={plan?.startDate}
         initialEndDate={plan?.endDate}
       />
+      
+      {/* 다이얼로그 추가 */}
+      <CustomDialog
+        open={openSuccessDialog}
+        onClose={() => setOpenSuccessDialog(false)}
+        title="성공"
+        confirmButtonText="확인"
+        onConfirm={handleSuccessConfirm}
+      >
+        여행 정보가 성공적으로 저장되었습니다.
+      </CustomDialog>
+      
+      <CustomDialog
+        open={openErrorDialog}
+        onClose={() => setOpenErrorDialog(false)}
+        title="오류"
+        confirmButtonText="확인"
+      >
+        {errorMessage}
+      </CustomDialog>
+      
+      <CustomDialog
+        open={openConfirmDialog}
+        onClose={() => setOpenConfirmDialog(false)}
+        title="확인"
+        confirmButtonText="확인"
+        cancelButtonText="취소"
+        showCancelButton={true}
+        onConfirm={handleCancelConfirm}
+      >
+        변경 사항을 저장하지 않고 나가시겠습니까?
+      </CustomDialog>
     </Container>
   );
 }
