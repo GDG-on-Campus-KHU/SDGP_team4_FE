@@ -204,7 +204,28 @@ export default function TripDetailPage() {
             area: tripData.area,
             startDate: tripData.dateRange.split(' ~ ')[0],
             endDate: tripData.dateRange.split(' ~ ')[1],
-            days: tripData.days
+            days: tripData.days,
+            thumbnail: tripData.thumbnail
+        }));
+        
+        // 지도 페이지로 이동
+        router.push('/map');
+    };
+
+    // 지도에서 보기 버튼 핸들러 추가
+    const handleViewOnMap = () => {
+        if (!tripData) return;
+        
+        // Redux 액션을 디스패치하여 여행 정보 저장 (뷰 모드로 설정)
+        dispatch(setTravelInfo({
+            travelId: params.id as string,
+            title: tripData.title,
+            area: tripData.area,
+            startDate: tripData.dateRange.split(' ~ ')[0],
+            endDate: tripData.dateRange.split(' ~ ')[1],
+            days: tripData.days,
+            viewOnly: true, // 뷰 모드로 설정
+            thumbnail: tripData.thumbnail
         }));
         
         // 지도 페이지로 이동
@@ -235,7 +256,7 @@ export default function TripDetailPage() {
                                     <CalendarIcon>📅</CalendarIcon>
                                     {tripData.dateRange}
                                 </DateRange>
-                                <MapButton onClick={() => router.push(`/map?viewTravelId=${params.id}`)}>지도에서 보기</MapButton>
+                                <MapButton onClick={handleViewOnMap}>지도에서 보기</MapButton>
                             </div>
                             <ButtonContainer>
                                 <StyledButton 

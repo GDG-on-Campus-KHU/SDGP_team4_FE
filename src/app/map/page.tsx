@@ -851,8 +851,8 @@ export default function MapPage() {
       // 서버에 저장할 데이터 준비
       const travelUpdateDto = {
         title: travelInfo.title,
+        thumbnail: travelInfo.thumbnail,
         area: plan.region,
-        thumbnail: null, // 필요시 수정
         startDate: travelInfo.startDate, 
         endDate: travelInfo.endDate
       };
@@ -879,8 +879,6 @@ export default function MapPage() {
       // Redux 상태 초기화
       dispatch(resetTravelInfo());
       
-      // 알림 플래그만 유지하고 다른 sessoinStorage 항목은 제거할 필요가 있다면 여기에 추가
-      
       // 이전 페이지로 이동
       window.history.back();
     } catch (error) {
@@ -895,6 +893,12 @@ export default function MapPage() {
       dispatch(resetTravelInfo());
       window.history.back();
     }
+  };
+
+  // 돌아가기 핸들러 추가
+  const handleReturn = () => {
+    dispatch(resetTravelInfo());
+    window.history.back();
   };
 
   if (!isLoaded) return <div>지도를 불러오는 중...</div>;
@@ -1052,9 +1056,11 @@ export default function MapPage() {
           transportMode={transportMode}
           onTransportModeChange={handleTransportModeChange}
           onDeletePlace={handleDeletePlace}
-          isEditMode={travelInfo.isEditing}
+          isEditMode={travelInfo.isEditing && !travelInfo.viewOnly}
+          isViewOnly={travelInfo.viewOnly}
           onSave={handleSaveAndExit}
           onCancel={handleCancel}
+          onReturn={handleReturn}
         />
       ) : (
         <FloatingButton

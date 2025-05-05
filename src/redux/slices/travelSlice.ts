@@ -20,6 +20,8 @@ interface TravelInfo {
   endDate: string;
   days: Day[];
   isEditing: boolean;
+  viewOnly: boolean;
+  thumbnail: string | null;
 }
 
 const initialState: TravelInfo = {
@@ -29,7 +31,9 @@ const initialState: TravelInfo = {
   startDate: '',
   endDate: '',
   days: [],
-  isEditing: false
+  isEditing: false,
+  viewOnly: false,
+  thumbnail: null
 };
 
 const travelSlice = createSlice({
@@ -44,6 +48,8 @@ const travelSlice = createSlice({
       startDate: string;
       endDate: string;
       days: Day[];
+      viewOnly?: boolean;
+      thumbnail?: string | null;
     }>) => {
       state.travelId = action.payload.travelId;
       state.title = action.payload.title;
@@ -52,11 +58,18 @@ const travelSlice = createSlice({
       state.endDate = action.payload.endDate;
       state.days = action.payload.days;
       state.isEditing = true;
+      state.viewOnly = action.payload.viewOnly || false;
+      state.thumbnail = action.payload.thumbnail || null;
     },
     
     // 편집 모드 설정
     setEditingMode: (state, action: PayloadAction<boolean>) => {
       state.isEditing = action.payload;
+    },
+    
+    // 뷰 모드 설정
+    setViewOnly: (state, action: PayloadAction<boolean>) => {
+      state.viewOnly = action.payload;
     },
     
     // 여행 정보 초기화
@@ -101,6 +114,7 @@ const travelSlice = createSlice({
 export const { 
   setTravelInfo, 
   setEditingMode, 
+  setViewOnly,
   resetTravelInfo, 
   updatePlace, 
   removePlace 

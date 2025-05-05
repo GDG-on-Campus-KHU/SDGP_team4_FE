@@ -25,8 +25,10 @@ interface RightPanelProps {
     onDeletePlace: (dateStr: string, placeId: string) => void;
     onResetPlaces?: (dateStr: string) => void;
     isEditMode?: boolean;
+    isViewOnly?: boolean;
     onSave?: () => void;
     onCancel?: () => void;
+    onReturn?: () => void;
 }
 
 interface CreateTravelResponse {
@@ -56,8 +58,10 @@ const RightPanel = ({
     onDeletePlace,
     onResetPlaces,
     isEditMode,
+    isViewOnly,
     onSave,
     onCancel,
+    onReturn,
 }: RightPanelProps) => {
     const [totalTravelTime, setTotalTravelTime] = useState(0);
     const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
@@ -205,12 +209,13 @@ const RightPanel = ({
 
                                     return currentPlan?.places.length ? (
                                         <>
-                                            <ResetButton onClick={handleReset}>
-                                                장소선택 초기화
-                                            </ResetButton>
-                                            <PlaceList>
+                                            {!isViewOnly && (
+                                                <ResetButton onClick={handleReset}>
+                                                    장소선택 초기화
+                                                </ResetButton>
+                                            )}
+                                            <PlaceList isViewOnly={isViewOnly}>
                                                 {currentPlan.places.map((place, index) => (
-                                                    console.log("삭제시간확인", place),
                                                     <PlaceItem key={place.id}>
                                                         <PlaceNumber>{index + 1}</PlaceNumber>
                                                         <PlaceContent>
@@ -225,9 +230,11 @@ const RightPanel = ({
                                                                     {place.travelDurationText}
                                                                 </TravelTime>
                                                             )}
-                                                            <DeleteButton onClick={() => onDeletePlace(currentDate.toDateString(), place.id)}>
-                                                                <img src="/icons/trash.svg" alt="delete" />
-                                                            </DeleteButton>
+                                                            {!isViewOnly && (
+                                                                <DeleteButton onClick={() => onDeletePlace(currentDate.toDateString(), place.id)}>
+                                                                    <img src="/icons/trash.svg" alt="delete" />
+                                                                </DeleteButton>
+                                                            )}
                                                         </PlaceContent>
                                                     </PlaceItem>
                                                 ))}
@@ -239,17 +246,19 @@ const RightPanel = ({
                                                         {formatTravelTime(totalTravelTime)}
                                                     </Typography>
                                                 </div>
-                                                <TransportModeSelector>
-                                                    <TransportButton selected={transportMode === 'WALKING'} onClick={() => onTransportModeChange('WALKING')}>
-                                                        도보
-                                                    </TransportButton>
-                                                    <TransportButton selected={transportMode === 'TRANSIT'} onClick={() => onTransportModeChange('TRANSIT')}>
-                                                        대중교통
-                                                    </TransportButton>
-                                                    <TransportButton selected={transportMode === 'DRIVING'} onClick={() => onTransportModeChange('DRIVING')}>
-                                                        자동차
-                                                    </TransportButton>
-                                                </TransportModeSelector>
+                                                {!isViewOnly && (
+                                                    <TransportModeSelector>
+                                                        <TransportButton selected={transportMode === 'WALKING'} onClick={() => onTransportModeChange('WALKING')}>
+                                                            도보
+                                                        </TransportButton>
+                                                        <TransportButton selected={transportMode === 'TRANSIT'} onClick={() => onTransportModeChange('TRANSIT')}>
+                                                            대중교통
+                                                        </TransportButton>
+                                                        <TransportButton selected={transportMode === 'DRIVING'} onClick={() => onTransportModeChange('DRIVING')}>
+                                                            자동차
+                                                        </TransportButton>
+                                                    </TransportModeSelector>
+                                                )}
                                             </EstimatedTimeBox>
                                         </>
                                     ) : (
@@ -263,7 +272,16 @@ const RightPanel = ({
                         )}
 
                         <BottomSection>
-                            {isEditMode ? (
+                            {isViewOnly ? (
+                                <Button 
+                                    color="primary" 
+                                    variant="outlined" 
+                                    fullWidth
+                                    onClick={onReturn}
+                                >
+                                    돌아가기
+                                </Button>
+                            ) : isEditMode ? (
                                 <ButtonContainer>
                                     <SaveButton variant="contained" onClick={onSave}>
                                         저장하고 나가기
@@ -416,13 +434,14 @@ const ArrowButton = styled(Button)`
   }
 `;
 
-const PlaceList = styled(Box)`
+const PlaceList = styled(Box)<{ isViewOnly?: boolean }>`
   width: 100%;
   height: 100%;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-top: ${({ isViewOnly }) => isViewOnly ? '12px' : undefined};
 `;
 
 const PlaceItem = styled(Box)`

@@ -16,6 +16,7 @@ interface Place {
   name: string;
   address: string;
   description?: string;
+  moveTime?: number;
 }
 
 interface Day {
@@ -54,6 +55,10 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
       editorInstance.setHTML('');
     }
   }, []);
+
+  useEffect(() => {
+    console.log("days", days);
+  }, [days]);
 
   // 이미지 업로드 핸들러
   const handleImageUpload = async (file: File, callback: (url: string, altText: string) => void) => {
@@ -121,7 +126,7 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
             address: place.address,
             description: place.description || "",
             courseDate: day.date,
-            moveTime: 0 // 기본값 설정
+            moveTime: place.moveTime || 0 // 기본값 설정
           });
         }
       }
