@@ -85,6 +85,7 @@ const Sidebar = ({
       setEmotions({ best: 0, good: 0, soso: 0, bad: 0 });
       setComments([]);
       setPlaceInfo(null);
+      setMyFeedback(null); // 장소 변경 시 선택된 피드백 상태 초기화
     }
   }, [selectedPlace]); // 장소 이름이나 주소가 변경될 때만 실행
 

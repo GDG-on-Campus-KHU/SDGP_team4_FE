@@ -96,14 +96,8 @@ const RightPanel = ({
     };
 
     const confirmReset = () => {
-        const currentPlan = dayPlans.find(plan => 
-            plan.date.toDateString() === currentDate.toDateString()
-        );
-        
-        if (currentPlan) {
-            currentPlan.places.forEach(place => {
-                onDeletePlace(currentDate.toDateString(), place.id);
-            });
+        if (currentDate && onResetPlaces) {
+            onResetPlaces(currentDate.toDateString());
         }
         setOpenConfirmDialog(false);
     };
