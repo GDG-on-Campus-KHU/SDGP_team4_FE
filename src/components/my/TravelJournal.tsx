@@ -109,7 +109,6 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
       const postRes = await api.post(`/v1/travel/${travelInfo.travelId}/post`, {
         title,
         description: html,
-        imgUrls: uploadedImages.length > 0 ? uploadedImages.join(',') : "" // 콤마로 구분된 문자열로 변환
       });
 
       console.log("게시글 저장 응답:", postRes);
