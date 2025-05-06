@@ -568,8 +568,8 @@ export default function MapPage() {
   const findMatchingPin = useCallback((pins: Array<{placeId: number; latitude: number; longitude: number; commentsCnt: number}>, lat: number, lng: number) => {
     console.log(`맵핀 검색 시작 - 좌표(${lat}, ${lng}), 맵핀 수: ${pins.length}`);
     
-    // 위도/경도 차이 비교 (0.005도 = 약 550미터까지 확장)
-    const tolerance = 0.005;
+    // 위도/경도 차이 비교 (0.0001도 = 약 11미터 이내로 정확히 일치하는 맵핀만 찾음)
+    const tolerance = 0.0001;
     
     // 1. 모든 맵핀을 순회하며 위도/경도 차이 계산
     const pinsWithDiff = pins.map(pin => {
