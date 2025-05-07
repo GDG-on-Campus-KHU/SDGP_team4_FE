@@ -451,12 +451,15 @@ export default function MyPage() {
       return (
         <PaginationContainer>
           <Pagination
+          sx={{
+            '& .MuiPaginationItem-root': {
+              color: '#C1C1C1',
+              borderColor: '#C1C1C1',
+            },
+          }}
             count={savedPostTotalPages}
             page={savedPostPage}
             onChange={handleSavedPostPageChange}
-            color="primary"
-            showFirstButton
-            showLastButton
           />
         </PaginationContainer>
       );

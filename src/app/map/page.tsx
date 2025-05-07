@@ -794,10 +794,10 @@ export default function MapPage() {
       setDayPlans(formattedDays);
       
       // 3. 편집 모드 알림 표시 - 최초 접속 시에만 표시
-      if (!sessionStorage.getItem('editModeAlertShown')) {
-        alert('여행 정보를 수정 모드로 불러왔습니다. 장소를 추가하거나 변경할 수 있습니다.');
-        sessionStorage.setItem('editModeAlertShown', 'true');
-      }
+      // if (!sessionStorage.getItem('editModeAlertShown')) {
+      //   alert('여행 정보를 수정 모드로 불러왔습니다. 장소를 추가하거나 변경할 수 있습니다.');
+      //   sessionStorage.setItem('editModeAlertShown', 'true');
+      // }
       
       // 4. 지오코딩으로 장소 좌표 업데이트
       const geocodeAndUpdatePlaces = async () => {
