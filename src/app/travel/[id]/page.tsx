@@ -16,6 +16,7 @@ import '@toast-ui/editor/dist/toastui-editor.css';
 import colorSyntax from '@toast-ui/editor-plugin-color-syntax';
 import '@toast-ui/editor-plugin-color-syntax/dist/toastui-editor-plugin-color-syntax.css';
 import '@toast-ui/editor/dist/i18n/ko-kr';
+import CustomDialog from '@/components/common/CustomDialog';
 
 const TravelDetailPage = () => {
   const { id } = useParams();
@@ -29,6 +30,37 @@ const TravelDetailPage = () => {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const editorRef = useRef<any>(null);
+  
+  // CustomDialog 관련 상태 추가
+  const [dialog, setDialog] = useState({
+    open: false,
+    title: '',
+    content: '',
+    confirmButtonText: '확인',
+    cancelButtonText: '취소',
+    showCancel: false,
+    onConfirm: () => {},
+    onCancel: () => {}
+  });
+  
+  // 공통으로 사용할 다이얼로그 표시 함수
+  const showDialog = (options: any) => {
+    setDialog({
+      open: true,
+      title: options.title || '알림',
+      content: options.content || '',
+      confirmButtonText: options.confirmButtonText || '확인',
+      cancelButtonText: options.cancelButtonText || '취소',
+      showCancel: options.showCancel || false,
+      onConfirm: options.onConfirm || (() => setDialog(prev => ({ ...prev, open: false }))),
+      onCancel: options.onCancel || (() => setDialog(prev => ({ ...prev, open: false })))
+    });
+  };
+  
+  // 공통으로 사용할 확인 다이얼로그 닫기 함수
+  const closeDialog = () => {
+    setDialog(prev => ({ ...prev, open: false }));
+  };
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -79,25 +111,42 @@ const TravelDetailPage = () => {
         callback(imageUrl, file.name);
       } else {
         console.error('이미지 업로드 응답 형식 오류:', response);
-        alert('이미지 업로드에 실패했습니다.');
+        showDialog({
+          title: '오류',
+          content: '이미지 업로드에 실패했습니다.',
+        });
       }
     } catch (error) {
       console.error('이미지 업로드 오류:', error);
-      alert('이미지 업로드 중 오류가 발생했습니다.');
+      showDialog({
+        title: '오류',
+        content: '이미지 업로드 중 오류가 발생했습니다.',
+      });
     }
   };
 
   // 수정 취소
   const onClose = () => {
-    if (confirm('수정을 취소하시겠습니까? 변경 사항이 저장되지 않습니다.')) {
-      setIsEditing(false);
-    }
+    showDialog({
+      title: '수정 취소',
+      content: '수정을 취소하시겠습니까?',
+      showCancel: true,
+      confirmButtonText: '확인',
+      cancelButtonText: '취소',
+      onConfirm: () => {
+        setIsEditing(false);
+        closeDialog();
+      }
+    });
   };
 
   // 수정된 내용 저장
   const handleSave = async () => {
     if (!title.trim()) {
-      alert('제목을 입력해주세요.');
+      showDialog({
+        title: '알림',
+        content: '제목을 입력해주세요.'
+      });
       return;
     }
 
@@ -109,28 +158,39 @@ const TravelDetailPage = () => {
       const updatedPost = {
         title: title,
         description: editorContent,
-        imgUrls: uploadedImages // 배열 그대로 전송
       };
 
       const response = await api.put(`/v1/post/${id}`, updatedPost);
 
       if (response.status === 200) {
         console.log("수정내용확인", updatedPost);
-        alert('게시글이 성공적으로 수정되었습니다.');
-        setIsEditing(false);
-
-        // 수정된 내용으로 post 업데이트
-        setPost((prev: any) => ({
-          ...prev,
-          title: title,
-          description: editorContent
-        }));
+        showDialog({
+          title: '성공',
+          content: '게시글이 성공적으로 수정되었습니다.',
+          onConfirm: () => {
+            setIsEditing(false);
+            closeDialog();
+            
+            // 수정된 내용으로 post 업데이트
+            setPost((prev: any) => ({
+              ...prev,
+              title: title,
+              description: editorContent
+            }));
+          }
+        });
       } else {
-        alert('게시글 수정에 실패했습니다.');
+        showDialog({
+          title: '오류',
+          content: '게시글 수정에 실패했습니다.'
+        });
       }
     } catch (error: any) {
       console.error('게시글 수정 오류:', error);
-      alert('게시글 수정 중 오류가 발생했습니다: ' + (error.response?.data?.message || error.message));
+      showDialog({
+        title: '오류',
+        content: '게시글 수정 중 오류가 발생했습니다: ' + (error.response?.data?.message || error.message)
+      });
     } finally {
       setLoading(false);
     }
@@ -138,26 +198,44 @@ const TravelDetailPage = () => {
 
   // 게시글 삭제
   const handleDelete = async () => {
-    if (!confirm('정말로 이 게시글을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-      return;
-    }
+    showDialog({
+      title: '삭제 확인',
+      content: '정말로 이 게시글을 삭제하시겠습니까?',
+      showCancel: true,
+      confirmButtonText: '삭제',
+      cancelButtonText: '취소',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          closeDialog();
+          const response = await api.delete(`/v1/post/${id}`);
 
-    try {
-      setLoading(true);
-      const response = await api.delete(`/v1/post/${id}`);
-
-      if (response.status === 200) {
-        alert('게시글이 성공적으로 삭제되었습니다.');
-        router.push('/travel'); // 목록 페이지로 이동
-      } else {
-        alert('게시글 삭제에 실패했습니다.');
+          if (response.status === 200) {
+            showDialog({
+              title: '성공',
+              content: '게시글이 성공적으로 삭제되었습니다.',
+              onConfirm: () => {
+                closeDialog();
+                router.back(); // 이전 페이지로 돌아가기
+              }
+            });
+          } else {
+            showDialog({
+              title: '오류',
+              content: '게시글 삭제에 실패했습니다.'
+            });
+          }
+        } catch (error: any) {
+          console.error('게시글 삭제 오류:', error);
+          showDialog({
+            title: '오류',
+            content: '게시글 삭제 중 오류가 발생했습니다: ' + (error.response?.data?.message || error.message)
+          });
+        } finally {
+          setLoading(false);
+        }
       }
-    } catch (error: any) {
-      console.error('게시글 삭제 오류:', error);
-      alert('게시글 삭제 중 오류가 발생했습니다: ' + (error.response?.data?.message || error.message));
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   // post 상태 변경 시 콘솔 출력
@@ -172,7 +250,10 @@ const TravelDetailPage = () => {
       const { likeCount, isMyLike } = (res.data as any).data || (res.data as any);
       setPost((prev: any) => ({ ...prev, likeCount, isMyLike }));
     } catch (e: any) {
-      alert('좋아요 처리 실패: ' + (e.response?.data?.message || e.message));
+      showDialog({
+        title: '오류',
+        content: '좋아요 처리 실패: ' + (e.response?.data?.message || e.message)
+      });
     }
   };
 
@@ -333,6 +414,19 @@ const TravelDetailPage = () => {
           })()} />
         </Box>
       </ContentWrapper>
+      
+      {/* CustomDialog 추가 */}
+      <CustomDialog
+        open={dialog.open}
+        onClose={closeDialog}
+        title={dialog.title}
+        confirmButtonText={dialog.confirmButtonText}
+        cancelButtonText={dialog.cancelButtonText}
+        showCancelButton={dialog.showCancel}
+        onConfirm={dialog.onConfirm}
+      >
+        {dialog.content}
+      </CustomDialog>
     </Wrapper>
   );
 };

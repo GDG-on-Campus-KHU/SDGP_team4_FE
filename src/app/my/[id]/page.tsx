@@ -278,12 +278,7 @@ export default function TripDetailPage() {
                                   장소 수정하기
                                 </StyledButton>
                                 {tripData.isPost ? (
-                                    <StyledButton
-                                        variant="contained"
-                                        
-                                    >
-                                        여행일지 보기
-                                    </StyledButton>
+                                    null
                                 ) : (
                                     <StyledButton
                                         variant="contained"

@@ -165,7 +165,7 @@ const TravelPage = () => {
             <ContentWrapper>
                 <SearchSection>
                     <SearchInput
-                        placeholder="지역을 검색해보세요!"
+                        placeholder="검색어를 입력하세요."
                         value={searchTerm}
                         onChange={handleSearchChange}
                         onKeyDown={handleKeyDown}

@@ -11,6 +11,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import TravelPlanViewer from '@/components/common/TravelPlanViewer';
 import CustomDialog from '@/components/common/CustomDialog';
 import api from '@/utils/axios';
+import { useRouter } from 'next/navigation';
 
 interface Place {
   name: string;
@@ -46,6 +47,8 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
   const [openSuccessDialog, setOpenSuccessDialog] = useState(false);
   const [openTitleDialog, setOpenTitleDialog] = useState(false);
   const [dialogMessage, setDialogMessage] = useState('');
+
+  const router = useRouter();
 
   // 에디터 초기화
   useEffect(() => {
@@ -170,6 +173,7 @@ export default function TravelJournal({ onClose, travelInfo, days }: TravelJourn
   const handleSuccessClose = () => {
     setOpenSuccessDialog(false);
     onClose(); // 성공 후 닫기
+    router.push('/my');
   };
 
   useEffect(() => {

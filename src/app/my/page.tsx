@@ -9,6 +9,7 @@ import EditProfileModal from '@/components/my/EditProfileModal';
 import CustomDialog from '@/components/common/CustomDialog';
 import api from '@/utils/axios';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 
 // 인터페이스 정의 수정
 interface TravelContent {
@@ -346,6 +347,31 @@ export default function MyPage() {
     }
   };
 
+  const handleBookmarkClick = async (postId: number) => {
+    try {
+      const res = await api.post(`/v1/post/${postId}`);
+      const { likeCount, isMyLike } = (res.data as any).data || (res.data as any);
+      
+      // activeTab에 따라 적절한 상태 업데이트
+      if (activeTab === 1) {
+        setMyPosts(prev => prev.map(p => 
+          p.postId === postId 
+            ? { ...p, isMyLike: !p.isMyLike, likeCount } 
+            : p
+        ));
+      } else if (activeTab === 2) {
+        setSavedPosts(prev => prev.map(p => 
+          p.postId === postId 
+            ? { ...p, isMyLike: !p.isMyLike, likeCount } 
+            : p
+        ));
+      }
+    } catch (e: any) {
+      setErrorMessage('좋아요 처리 실패: ' + (e.response?.data?.message || e.message));
+      setOpenErrorDialog(true);
+    }
+  };
+
   // 게시물 카드 렌더링 함수
   const renderPostCard = (post: PostContent, isSaved: boolean = false) => {
     const thumbnailUrl = post.thumbnail || extractImageUrl(post.description) || null;
@@ -405,6 +431,31 @@ export default function MyPage() {
             📅 작성일: {post.date}
           </Typography>
         </CardContent>
+        <div
+          style={{
+            position: 'absolute',
+            top: '1rem',
+            right: '1rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+          onClick={e => {
+            e.stopPropagation();
+            handleBookmarkClick(post.postId);
+          }}
+        >
+          <div style={{
+            fontSize: '12px',
+            color: '#333'
+          }}>{post.likeCount ?? 0}</div>
+          {post.isMyLike ? (
+            <BookmarkIcon sx={{ color: 'black' }} />
+          ) : (
+            <BookmarkBorderIcon sx={{ color: 'black' }} />
+          )}
+        </div>
       </StyledCard>
     );
   };
@@ -451,12 +502,12 @@ export default function MyPage() {
       return (
         <PaginationContainer>
           <Pagination
-          sx={{
-            '& .MuiPaginationItem-root': {
-              color: '#C1C1C1',
-              borderColor: '#C1C1C1',
-            },
-          }}
+            sx={{
+              '& .MuiPaginationItem-root': {
+                color: '#C1C1C1',
+                borderColor: '#C1C1C1',
+              },
+            }}
             count={savedPostTotalPages}
             page={savedPostPage}
             onChange={handleSavedPostPageChange}
