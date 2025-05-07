@@ -26,6 +26,10 @@ interface TravelInfo {
     name: string;
     address: string;
   };
+  initialPlace?: {
+    name: string;
+    address: string;
+  };
 }
 
 const initialState: TravelInfo = {
@@ -38,7 +42,8 @@ const initialState: TravelInfo = {
   isEditing: false,
   viewOnly: false,
   thumbnail: null,
-  searchPlace: undefined
+  searchPlace: undefined,
+  initialPlace: undefined
 };
 
 const travelSlice = createSlice({
@@ -55,6 +60,10 @@ const travelSlice = createSlice({
       days: Day[];
       viewOnly?: boolean;
       thumbnail?: string | null;
+      initialPlace?: {
+        name: string;
+        address: string;
+      };
     }>) => {
       state.travelId = action.payload.travelId;
       state.title = action.payload.title;
@@ -65,6 +74,7 @@ const travelSlice = createSlice({
       state.isEditing = true;
       state.viewOnly = action.payload.viewOnly || false;
       state.thumbnail = action.payload.thumbnail || null;
+      state.initialPlace = action.payload.initialPlace;
     },
     
     // 편집 모드 설정

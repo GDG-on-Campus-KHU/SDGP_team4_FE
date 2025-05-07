@@ -197,6 +197,10 @@ export default function TripDetailPage() {
     const handleEditPlaces = () => {
         if (!tripData) return;
         
+        // 첫 번째 날짜의 첫 번째 장소 정보 가져오기
+        const firstDayPlaces = tripData.days[0]?.places || [];
+        const firstPlace = firstDayPlaces[0] || null;
+        
         // Redux 액션을 디스패치하여 여행 정보 저장
         dispatch(setTravelInfo({
             travelId: params.id as string,
@@ -205,7 +209,11 @@ export default function TripDetailPage() {
             startDate: tripData.dateRange.split(' ~ ')[0],
             endDate: tripData.dateRange.split(' ~ ')[1],
             days: tripData.days,
-            thumbnail: tripData.thumbnail
+            thumbnail: tripData.thumbnail,
+            initialPlace: firstPlace ? {
+                name: firstPlace.name,
+                address: firstPlace.address
+            } : undefined
         }));
         
         // 지도 페이지로 이동
@@ -216,6 +224,10 @@ export default function TripDetailPage() {
     const handleViewOnMap = () => {
         if (!tripData) return;
         
+        // 첫 번째 날짜의 첫 번째 장소 정보 가져오기
+        const firstDayPlaces = tripData.days[0]?.places || [];
+        const firstPlace = firstDayPlaces[0] || null;
+        
         // Redux 액션을 디스패치하여 여행 정보 저장 (뷰 모드로 설정)
         dispatch(setTravelInfo({
             travelId: params.id as string,
@@ -225,7 +237,11 @@ export default function TripDetailPage() {
             endDate: tripData.dateRange.split(' ~ ')[1],
             days: tripData.days,
             viewOnly: true, // 뷰 모드로 설정
-            thumbnail: tripData.thumbnail
+            thumbnail: tripData.thumbnail,
+            initialPlace: firstPlace ? {
+                name: firstPlace.name,
+                address: firstPlace.address
+            } : undefined
         }));
         
         // 지도 페이지로 이동

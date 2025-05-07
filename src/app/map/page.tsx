@@ -1010,6 +1010,49 @@ export default function MapPage() {
     }
   }, [isLoaded, map, travelInfo.searchPlace, dispatch]);
 
+  // Map 컴포넌트 로드 후 초기 위치 설정을 위한 useEffect 추가
+  useEffect(() => {
+    // Google Maps API가 로드되었는지 확인
+    if (!isLoaded || !map) return;
+    
+    // travelInfo에서 initialPlace가 있으면 해당 위치로 초기화
+    if (travelInfo.initialPlace) {
+      console.log('초기 장소로 지도 이동:', travelInfo.initialPlace);
+      
+      const geocoder = new google.maps.Geocoder();
+      const searchKeyword = travelInfo.initialPlace.address || travelInfo.initialPlace.name;
+      
+      geocoder.geocode(
+        { address: searchKeyword, region: 'KR' },
+        (results, status) => {
+          if (status === 'OK' && results?.[0]) {
+            const location = results[0].geometry.location;
+            
+            // 지도를 해당 위치로 이동
+            map.panTo(location);
+            setTimeout(() => {
+              map.setZoom(14); // 적절한 줌 레벨 설정
+            }, 300);
+            
+            console.log('초기 장소 설정 완료:', location.lat(), location.lng());
+            
+            // 검색 결과를 보류 상태로 저장
+            setPendingSearchResult({
+              lat: location.lat(),
+              lng: location.lng(),
+              name: travelInfo.initialPlace?.name || '',
+              address: travelInfo.initialPlace?.address || '',
+              isFromGeocoder: true
+            });
+            
+            // 검색 후 맵 업데이트 플래그 설정
+            searchAfterMapUpdate.current = true;
+          }
+        }
+      );
+    }
+  }, [isLoaded, map, travelInfo.initialPlace]);
+
   if (!isLoaded) return <div>지도를 불러오는 중...</div>;
 
   return (
