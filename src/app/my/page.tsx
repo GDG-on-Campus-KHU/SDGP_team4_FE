@@ -330,16 +330,10 @@ export default function MyPage() {
 
     try {
       await api.post(`/v1/post/${selectedPostId}`);
-      setSavedPosts((prev) => prev.filter((p) => p.postId !== selectedPostId));
       setOpenUnsaveDialog(false);
-
-      // 현재 페이지의 항목이 모두 삭제되었을 경우, 이전 페이지로 이동
-      if (savedPosts.length === 1 && savedPostPage > 1) {
-        setSavedPostPage(prev => prev - 1);
-        fetchSavedPosts(savedPostPage - 2);
-      } else {
-        fetchSavedPosts(savedPostPage - 1);
-      }
+      
+      // 북마크 해제 후 저장한 여행 목록 다시 불러오기
+      fetchSavedPosts(savedPostPage - 1);
     } catch (error) {
       setErrorMessage('저장 취소에 실패했습니다.');
       setOpenErrorDialog(true);
@@ -349,22 +343,15 @@ export default function MyPage() {
 
   const handleBookmarkClick = async (postId: number) => {
     try {
-      const res = await api.post(`/v1/post/${postId}`);
-      const { likeCount, isMyLike } = (res.data as any).data || (res.data as any);
+      await api.post(`/v1/post/${postId}`);
       
-      // activeTab에 따라 적절한 상태 업데이트
+      // activeTab에 따라 적절한 데이터 다시 불러오기
       if (activeTab === 1) {
-        setMyPosts(prev => prev.map(p => 
-          p.postId === postId 
-            ? { ...p, isMyLike: !p.isMyLike, likeCount } 
-            : p
-        ));
+        // 내 여행일지 탭에서는 좋아요 상태만 업데이트
+        fetchMyPosts(myPostPage - 1);
       } else if (activeTab === 2) {
-        setSavedPosts(prev => prev.map(p => 
-          p.postId === postId 
-            ? { ...p, isMyLike: !p.isMyLike, likeCount } 
-            : p
-        ));
+        // 저장한 여행 탭에서는 목록 전체 다시 불러오기
+        fetchSavedPosts(savedPostPage - 1);
       }
     } catch (e: any) {
       setErrorMessage('좋아요 처리 실패: ' + (e.response?.data?.message || e.message));
