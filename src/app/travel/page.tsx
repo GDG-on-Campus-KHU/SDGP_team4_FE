@@ -132,7 +132,6 @@ const TravelPage = () => {
             try {
                 const res = await api.get(`/v1/post?page=${page - 1}&size=${itemsPerPage}`);
                 const data: any = res.data;
-                // 서버 응답 구조에 맞게 변환 (필요시 매핑)
                 const content = data.data?.content || data.content || [];
                 setPosts(content);
                 setFilteredPosts(sortPosts(content)); // 정렬 적용

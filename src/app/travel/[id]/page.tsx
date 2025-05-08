@@ -246,9 +246,18 @@ const TravelDetailPage = () => {
   const handleBookmarkClick = async () => {
     if (!post) return;
     try {
-      const res = await api.post(`/v1/post/${post.postId}`);
-      const { likeCount, isMyLike } = (res.data as any).data || (res.data as any);
-      setPost((prev: any) => ({ ...prev, likeCount, isMyLike }));
+      // 좋아요 토글 요청
+      await api.post(`/v1/post/${post.postId}`);
+      
+      // 게시글 정보 다시 가져오기
+      const refreshRes = await api.get(`/v1/post/${post.postId}`);
+      const refreshData = (refreshRes.data as any).data || (refreshRes.data as any);
+      
+      // 전체 데이터 업데이트
+      setPost(refreshData.postSimpleDto || null);
+      setCourses(refreshData.courseInfoDtos || []);
+      
+      console.log("북마크 처리 완료 - 새로운 데이터:", refreshData.postSimpleDto);
     } catch (e: any) {
       showDialog({
         title: '오류',
