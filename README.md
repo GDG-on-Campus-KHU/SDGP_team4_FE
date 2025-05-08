@@ -1,37 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌍 Mapory
 
-## Getting Started
+**Mapory**는 지도 기반 여행 플랫폼으로, 사용자가 방문한 장소에 짧은 후기를 남기고 이를 지도 위에 시각화하여, 여행 정보를 쉽고 재밌게 공유하고 계획할 수 있도록 돕는 서비스입니다.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🧭 서비스 컨셉
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- 사용자가 방문한 장소에 감정이 담긴 **짧은 코멘트**를 남기고, 이를 지도 위에 **말풍선 형식**으로 시각화
+- 다른 사용자들과 여행 정보 공유 + **여행 계획 수립 지원**
+- **현지인의 생생한 후기**를 통해 신뢰도 높은 정보 제공
+- **숨겨진 로컬 명소**까지 발견하여 **특별한 여행 경험** 제공
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📌 주요 기능 소개
 
-## Learn More
+### 🗺 지도 페이지
 
-To learn more about Next.js, take a look at the following resources:
+#### ✅ 장소 관련 기능
+- 지도 화면 내 장소별 **댓글/코멘트 시각화**
+- 댓글이 있는 장소는 지도에서 바로 확인 가능
+- 각 장소에 대한 **기본 정보 + 사용자 후기 + 감정 이모지** 제공
+- 여행자 vs 현지인 댓글 구분 기능
+- **AI 댓글 요약** 기능으로 장소에 대한 전반적인 인상 파악 가능
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+#### ✅ 여행 계획 기능
+- 댓글을 참고하거나 검색을 통해 지도에서 장소 선택
+- 장소를 추가하여 날짜별 일정 구성
+- 장소 간 선 연결로 **이동 경로 시각화 + 이동 시간 자동 계산**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+### 📓 여행일지 페이지
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- 여행이 끝난 후 **여행 일지 작성 및 게시 가능**
+- 다른 사람의 여행 일지 **열람 + 북마크 기능** 제공
+- 다른 사람의 계획 참고하여 나만의 일정 구성 가능
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# SDGP_team4_FE
+---
+
+### 🙋‍♀️ 마이페이지
+
+- 내 정보 수정 (닉네임, 거주 지역)
+- 내가 만든 여행 일정 보기
+- 내가 북마크한 여행일지 보기
+
+---
+
+## 🌱 기대 효과
+
+- **직관적인 UI**로 장소 정보 + 사용자 후기를 한눈에 파악
+- 사용자 친화적인 UX로 여행 일정 구성에 도움
+- **숨은 로컬 명소 발굴**을 통한 지역 관광 활성화
+- 댓글 기반 **AI 요약**으로 정보 습득 효율 증가
+
+---
+
+## 🧩 주요 기술 기능 요약
+
+- 로그인 / 회원가입
+- 장소별 댓글 CRUD (로그인 필요)
+- 지도에 보이는 영역의 장소 리스트 API 연동
+- 장소 상세 보기 + AI 요약
+- 여행 일정 생성 / 수정 / 삭제
+- 이동시간 계산 및 시각화
+- 게시글(일지) CRUD 및 페이지네이션
+- 북마크 기능
+- 유저 프로필 관리
+
+---
+
+## 🗺 UI 특징
+
+- 지도 기반 인터페이스
+- 말풍선 + 이모지 형식의 장소 후기
+- 장소별 선 연결로 동선 시각화
+- 여행 계획을 바탕으로 실제 여행일지 기록 가능
+
+---
+
+## 🧠 AI 기능
+
+- 장소별 댓글을 요약하여 전체적인 인상 및 정보를 빠르게 파악 가능
+
+---
+
+## 🎯 프로젝트 목표
+
+> "여행 계획을 세우는 과정도 즐거울 수 는 없을까?"
+
+Mapory는 사용자에게 **직접적이고 실용적인 여행 정보**를 제공하며, 누구나 쉽고 즐겁게 여행을 준비할 수 있도록 돕습니다.
