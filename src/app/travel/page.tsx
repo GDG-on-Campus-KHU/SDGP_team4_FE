@@ -197,7 +197,9 @@ const TravelPage = () => {
                     <>
                         <div style={{ marginTop: '50px' }}>
                             {error ? (
-                                <div style={{ color: 'red' }}>에러: {error}</div>
+                                <div style={{ textAlign: 'center', margin: '50px 0', color: '#666' }}>
+                                    여행 게시글을 불러오는데 실패했습니다.
+                                </div>
                             ) : filteredPosts.length === 0 ? (
                                 <div style={{ textAlign: 'center', margin: '50px 0', color: '#666' }}>
                                     검색 결과가 없습니다.
